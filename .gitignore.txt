@@ -1,0 +1,5 @@
+node_modules/
+nng-data.json
+.env
+backend/uploads/*
+frontend/dist/
