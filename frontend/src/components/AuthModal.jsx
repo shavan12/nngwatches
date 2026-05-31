@@ -115,7 +115,7 @@ export default function AuthModal() {
           {/* Demo hint */}
           {mode === 'login' && (
             <div style={{ padding:'10px 14px', background:'var(--bg-elevated)', border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-sm)', fontSize:'0.72rem', color:'var(--text-muted)', textAlign:'center' }}>
-              Admin login: <strong style={{ color:'var(--gold)' }}>admin@ngg.com</strong> / <strong style={{ color:'var(--gold)' }}>admin123</strong>
+              {/* Admin login: <strong style={{ color:'var(--gold)' }}>admin@ngg.com</strong> / <strong style={{ color:'var(--gold)' }}>admin123</strong> */}
             </div>
           )}
         </form>
