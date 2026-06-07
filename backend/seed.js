@@ -81,19 +81,19 @@ products.forEach(([name,brand_id,cat_id,price,orig,ref,mov,mat,dia,wr,desc,stock
   ;(imgMap[i+1]||[]).forEach((url,si) => db.insert('product_images', { product_id:p.id, url, sort_order:si }))
 })
 
-// Sample orders
-const sampleOrders = [
-  { num:'ORD-2024-001', name:'Ahmed Al-Rashid', email:'ahmed@email.com', phone:'+971501234567', addr:'123 Palm Jumeirah', city:'Dubai',    country:'UAE',          sub:12500, ship:0, total:12500, status:'delivered', pid:1 },
-  { num:'ORD-2024-002', name:'Sarah Johnson',   email:'sarah@email.com', phone:'+12125550100',  addr:'456 Fifth Ave',    city:'New York', country:'USA',          sub:32000, ship:0, total:32000, status:'shipped',   pid:2 },
-  { num:'ORD-2024-003', name:'Mohammed Hassan', email:'moh@email.com',   phone:'+96650000000',  addr:'789 King Road',    city:'Riyadh',   country:'Saudi Arabia', sub:18000, ship:0, total:18000, status:'processing',pid:4 },
-  { num:'ORD-2024-004', name:'Emma Williams',   email:'emma@email.com',  phone:'+447911123456', addr:'10 Knightsbridge', city:'London',   country:'UK',           sub:9800,  ship:0, total:9800,  status:'pending',   pid:5 },
-]
-sampleOrders.forEach(o => {
-  const order = db.insert('orders', { order_number:o.num, customer_name:o.name, customer_email:o.email, customer_phone:o.phone, shipping_address:o.addr, city:o.city, country:o.country, subtotal:o.sub, shipping:o.ship, total:o.total, status:o.status, notes:'' })
-  const prod  = db.byId('products', o.pid)
-  const brand = prod ? db.byId('brands', prod.brand_id) : null
-  if (prod) db.insert('order_items', { order_id:order.id, product_id:prod.id, product_name:prod.name, brand_name:brand?.name||'', price:o.sub, quantity:1 })
-})
+// // Sample orders
+// const sampleOrders = [
+//   { num:'ORD-2024-001', name:'Ahmed Al-Rashid', email:'ahmed@email.com', phone:'+971501234567', addr:'123 Palm Jumeirah', city:'Dubai',    country:'UAE',          sub:12500, ship:0, total:12500, status:'delivered', pid:1 },
+//   { num:'ORD-2024-002', name:'Sarah Johnson',   email:'sarah@email.com', phone:'+12125550100',  addr:'456 Fifth Ave',    city:'New York', country:'USA',          sub:32000, ship:0, total:32000, status:'shipped',   pid:2 },
+//   { num:'ORD-2024-003', name:'Mohammed Hassan', email:'moh@email.com',   phone:'+96650000000',  addr:'789 King Road',    city:'Riyadh',   country:'Saudi Arabia', sub:18000, ship:0, total:18000, status:'processing',pid:4 },
+//   { num:'ORD-2024-004', name:'Emma Williams',   email:'emma@email.com',  phone:'+447911123456', addr:'10 Knightsbridge', city:'London',   country:'UK',           sub:9800,  ship:0, total:9800,  status:'pending',   pid:5 },
+// ]
+// sampleOrders.forEach(o => {
+//   const order = db.insert('orders', { order_number:o.num, customer_name:o.name, customer_email:o.email, customer_phone:o.phone, shipping_address:o.addr, city:o.city, country:o.country, subtotal:o.sub, shipping:o.ship, total:o.total, status:o.status, notes:'' })
+//   const prod  = db.byId('products', o.pid)
+//   const brand = prod ? db.byId('brands', prod.brand_id) : null
+//   if (prod) db.insert('order_items', { order_id:order.id, product_id:prod.id, product_name:prod.name, brand_name:brand?.name||'', price:o.sub, quantity:1 })
+// })
 
 // ── Default hero slides ────────────────────────────────
 const defaultSlides = [
