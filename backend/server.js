@@ -268,9 +268,10 @@ app.delete('/api/slides/:id',admin,(req,res)=>{
 })
 
 // ════════ START ════════
-if(db.count('products')===0){
-  console.log('📦 No data found — running auto-seed...')
-  try{require('./seed')}catch(e){console.error('Seed error:',e.message)}
+if(db.count('users')===0){
+  const bcrypt = require('bcryptjs')
+  db.insert('users',{name:'Admin NNG',email:'admin@nng.com',password:bcrypt.hashSync('admin123',10),role:'admin',phone:''})
+  console.log('👤 Admin user created')
 }
 app.listen(PORT,()=>{
   console.log(`\n🚀 NNG Backend running on http://localhost:${PORT}`)
