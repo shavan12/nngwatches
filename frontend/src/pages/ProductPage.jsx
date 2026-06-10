@@ -464,11 +464,11 @@ export default function ProductPage() {
         </div>
 
         {/* trust bar */}
-        <div style={{ margin:'0 16px 20px', display:'flex', background:'var(--bg-elevated)', borderRadius:'var(--radius-sm)', border:'1px solid var(--border-subtle)' }}>
+        {/* <div style={{ margin:'0 16px 20px', display:'flex', background:'var(--bg-elevated)', borderRadius:'var(--radius-sm)', border:'1px solid var(--border-subtle)' }}>
           {['✓ Authentic','✓ Insured','✓ 14-Day Return'].map((b,i)=>(
             <span key={b} style={{ flex:1, padding:'10px 4px', textAlign:'center', fontSize:'0.62rem', color:'var(--text-muted)', borderRight:i<2?'1px solid var(--border-subtle)':'none' }}>{b}</span>
           ))}
-        </div>
+        </div> */}
 
         {/* tabs */}
         <div style={{ padding:'0 16px 36px' }}>
