@@ -1,8 +1,7 @@
 const fs   = require('fs')
 const path = require('path')
 
-const DB_FILE = path.join(__dirname, 'nng-data.json')
-
+const DB_FILE = process.env.DB_PATH || path.join(__dirname, 'nng-data.json')
 const DEFAULT = {
   users: [], brands: [], categories: [], products: [],
   product_images: [], orders: [], order_items: [],
