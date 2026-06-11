@@ -336,11 +336,11 @@ export default function ProductPage() {
                   </button>
                 </div>
               </div>
-              <div style={{ display:'flex', background:'var(--bg-elevated)', borderRadius:'var(--radius-sm)', border:'1px solid var(--border-subtle)' }}>
+              {/* <div style={{ display:'flex', background:'var(--bg-elevated)', borderRadius:'var(--radius-sm)', border:'1px solid var(--border-subtle)' }}>
                 {['✓ 100% Authentic','✓ Insured Shipping','✓ 14-Day Returns'].map((b,i)=>(
                   <span key={b} style={{ flex:1, padding:'10px 4px', textAlign:'center', fontSize:'0.65rem', color:'var(--text-muted)', borderRight:i<2?'1px solid var(--border-subtle)':'none' }}>{b}</span>
                 ))}
-              </div>
+              </div> */}
             </div>
           </div>
 
