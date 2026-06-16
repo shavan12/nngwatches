@@ -34,7 +34,7 @@ export function Footer() {
       <div className="container">
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:32, marginBottom:40 }}>
           <div>
-            <div style={{ fontFamily:'var(--font-display)', fontSize:'1.4rem', color:'var(--gold)', letterSpacing:'0.2em', marginBottom:10 }}>NNG</div>
+            <div style={{ fontFamily:'var(--font-display)', fontSize:'1.4rem', color:'var(--gold)', letterSpacing:'0.2em', marginBottom:10 }}>NG</div>
             <p style={{ fontSize:'0.78rem', color:'var(--text-muted)', lineHeight:1.8 }}>Premium luxury timepieces curated for the discerning collector.</p>
           </div>
           <div>
@@ -55,7 +55,7 @@ export function Footer() {
           </div>
         </div>
         <div style={{ borderTop:'1px solid var(--border-subtle)', paddingTop:20, display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:12 }}>
-          <span style={{ fontSize:'0.72rem', color:'var(--text-muted)' }}>© {new Date().getFullYear()} NNG Luxury Timepieces</span>
+          <span style={{ fontSize:'0.72rem', color:'var(--text-muted)' }}>© {new Date().getFullYear()} NG Luxury Timepieces</span>
           <span style={{ fontSize:'0.72rem', color:'var(--text-muted)' }}>All rights reserved</span>
         </div>
       </div>
