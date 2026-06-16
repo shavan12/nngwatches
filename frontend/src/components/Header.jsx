@@ -99,7 +99,7 @@ export default function Header() {
 
             {/* Logo */}
             <button onClick={() => navigate('/')} style={{ display: 'flex', flexDirection: 'column', alignItems: dir === 'rtl' ? 'flex-end' : 'flex-start', gap: 2, flexShrink: 0 }}>
-              <img src="/NGF.webp" alt="NNG" style={{height: 40,width: 'auto',objectFit: 'contain',cursor: 'pointer',}}onClick={() => navigate('/')}
+              <img src="/NGF.webp" alt="NG" style={{height: 40,width: 'auto',objectFit: 'contain',cursor: 'pointer',}}onClick={() => navigate('/')}
 />
             </button>
 
