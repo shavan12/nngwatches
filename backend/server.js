@@ -6,14 +6,23 @@ const jwt     = require('jsonwebtoken')
 const bcrypt  = require('bcryptjs')
 const multer  = require('multer')
 const db      = require('./db')
+const notificationService = require('./notificationService')
+const sseManager = require('./sseManager')
+const scheduler  = require('./scheduler')
+const pushService = require('./pushService')
+
+// Initialize push and notification services
+pushService.init()
+notificationService.init(sseManager, pushService)
 
 const app    = express()
 const PORT   = process.env.PORT || 4000
 const SECRET = process.env.JWT_SECRET || 'nng_luxury_secret_2025'
 
 // ── Uploads ──────────────────────────────────────────────
-const uploadsDir = path.join(__dirname,'uploads')
+const uploadsDir = process.env.UPLOADS_PATH || path.join(__dirname,'uploads')
 if(!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir,{recursive:true})
+console.log(`📁 Uploads path: ${uploadsDir}`)
 const upload = multer({
   storage: multer.diskStorage({
     destination: uploadsDir,
@@ -219,6 +228,8 @@ app.get('/api/stats',admin,(req,res)=>{
     total_orders:   db.count('orders'),
     total_users:    db.count('users',{role:'customer'}),
     total_revenue:  db.sum('orders','total',{status:'delivered'}),
+    total_auctions: db.count('auctions'),
+    active_auctions:db.all('auctions').filter(a=>a.enabled!==0&&!a.manually_ended&&new Date(a.end_date)>new Date()&&new Date(a.start_date)<=new Date()).length,
     recent_orders:  recentOrders,
     top_products:   topProducts,
   })
@@ -267,14 +278,404 @@ app.delete('/api/slides/:id',admin,(req,res)=>{
   db.delete('hero_slides',Number(req.params.id)); res.json({message:'Slide deleted'})
 })
 
+// ════════ AUCTION HELPERS ════════
+function resolveAuctionStatus(a) {
+  if(a.manually_ended) return 'ended'
+  const now=new Date(), start=new Date(a.start_date), end=new Date(a.end_date)
+  if(now<start) return 'upcoming'
+  if(now>=start&&now<=end) return 'live'
+  return 'ended'
+}
+
+function fullAuction(a) {
+  if(!a) return null
+  const status=resolveAuctionStatus(a)
+  const bids=db.all('bids',{auction_id:a.id}).sort((x,y)=>y.amount-x.amount)
+  const current_highest_bid=bids.length?bids[0].amount:null
+  const bidderIds=new Set(bids.map(b=>b.user_id))
+  const winner=db.get('auction_winners',{auction_id:a.id})
+  // Auto-select winner if ended and no winner yet
+  if(status==='ended'&&!winner&&bids.length>0){
+    const top=bids[0]
+    db.insert('auction_winners',{auction_id:a.id,user_id:top.user_id,user_name:top.user_name,amount:top.amount})
+  }
+  const finalWinner=winner||db.get('auction_winners',{auction_id:a.id})
+  const images=db.all('auction_images',{auction_id:a.id}).sort((x,y)=>x.sort_order-y.sort_order).map(i=>i.url)
+  return {
+    ...a,
+    status,
+    current_highest_bid,
+    bid_count:bids.length,
+    bidder_count:bidderIds.size,
+    winner:finalWinner?{user_name:finalWinner.user_name,amount:finalWinner.amount}:null,
+    images: images.length ? images : (a.image_url ? [a.image_url] : ['https://images.unsplash.com/photo-1547996160-81dfa63595aa?w=600&q=80']),
+  }
+}
+
+// ════════ AUCTIONS ════════
+// Public: list auctions
+app.get('/api/auctions',(req,res)=>{
+  let list=db.all('auctions').filter(a=>a.enabled!==0).map(fullAuction)
+  if(req.query.status) list=list.filter(a=>a.status===req.query.status)
+  list.sort((a,b)=>{
+    const order={live:0,upcoming:1,ended:2}
+    return (order[a.status]??9)-(order[b.status]??9)||new Date(a.end_date)-new Date(b.end_date)
+  })
+  res.json({data:list,total:list.length})
+})
+
+// Public: single auction with bids
+app.get('/api/auctions/:id',(req,res)=>{
+  const a=db.byId('auctions',Number(req.params.id))
+  if(!a) return res.status(404).json({error:'Not found'})
+  const result=fullAuction(a)
+  result.bids=db.all('bids',{auction_id:a.id}).sort((x,y)=>new Date(y.created_at)-new Date(x.created_at)).map(b=>({id:b.id,user_name:b.user_name,amount:b.amount,created_at:b.created_at}))
+  res.json(result)
+})
+
+// Auth: place bid
+app.post('/api/auctions/:id/bid',auth,(req,res)=>{
+  const a=db.byId('auctions',Number(req.params.id))
+  if(!a) return res.status(404).json({error:'Auction not found'})
+  const status=resolveAuctionStatus(a)
+  if(status!=='live') return res.status(400).json({error:'Auction is not active'})
+  if(a.enabled===0) return res.status(400).json({error:'Auction is disabled'})
+  const{amount}=req.body
+  if(!amount||isNaN(amount)) return res.status(400).json({error:'Valid bid amount required'})
+  const bidAmount=Number(amount)
+  const bids=db.all('bids',{auction_id:a.id}).sort((x,y)=>y.amount-x.amount)
+  const highest=bids.length?bids[0].amount:0
+  const minBid=highest>0?highest+a.min_increment:a.starting_price
+  if(bidAmount<minBid) return res.status(400).json({error:`Bid must be at least $${minBid.toLocaleString()}`})
+  // Anti-spam: reject if same user bid within last 3 seconds
+  const recentBid=bids.find(b=>b.user_id===req.user.id)
+  if(recentBid){
+    const diff=Date.now()-new Date(recentBid.created_at.replace(' ','T')+'Z').getTime()
+    if(diff<3000) return res.status(429).json({error:'Please wait before placing another bid'})
+  }
+  const bid=db.insert('bids',{auction_id:a.id,user_id:req.user.id,user_name:req.user.name,amount:bidAmount})
+  res.status(201).json({message:'Bid placed successfully',bid:{id:bid.id,amount:bidAmount,user_name:req.user.name}})
+
+  // ── Notification hooks ──
+  const auctionImage = (db.all('auction_images',{auction_id:a.id}).sort((x,y)=>x.sort_order-y.sort_order)[0]||{}).url || a.image_url || ''
+  // Notify previous highest bidder (outbid)
+  if(bids.length>0 && bids[0].user_id!==req.user.id){
+    notificationService.create(bids[0].user_id, notificationService.TYPES.OUTBID, {
+      auctionId: a.id,
+      title: "You've Been Outbid",
+      message: `Your bid on ${a.name} has been exceeded. Current bid: $${bidAmount.toLocaleString()}.`,
+      imageUrl: auctionImage,
+      actionUrl: `/auction/${a.id}`,
+      dedupKey: `outbid_${bid.id}`,
+    })
+  }
+  // Notify other participants about new bid
+  notificationService.createForParticipants(a.id, notificationService.TYPES.NEW_BID, {
+    auctionId: a.id,
+    title: 'New Bid',
+    message: `A new bid of $${bidAmount.toLocaleString()} has been placed on ${a.name}.`,
+    imageUrl: auctionImage,
+    actionUrl: `/auction/${a.id}`,
+    dedupKey: `bid_${bid.id}`,
+  }, req.user.id)
+  // Admin notification
+  notificationService.createAdminNotification(notificationService.TYPES.ADMIN_NEW_BID, {
+    auctionId: a.id,
+    title: 'New Bid Received',
+    message: `${req.user.name} bid $${bidAmount.toLocaleString()} on ${a.name}.`,
+    imageUrl: auctionImage,
+    actionUrl: '/admin',
+  })
+})
+
+// Admin: list all auctions (including disabled)
+app.get('/api/auctions/admin/all',admin,(req,res)=>{
+  const list=db.all('auctions').map(fullAuction).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))
+  res.json({data:list,total:list.length})
+})
+
+// Admin: create auction
+app.post('/api/auctions',admin,(req,res)=>{
+  const{name,brand='',description='',image_url='',starting_price,min_increment=50,start_date,end_date,enabled=1,images=[]}=req.body
+  if(!name||!starting_price||!start_date||!end_date) return res.status(400).json({error:'name, starting_price, start_date, end_date required'})
+  if(new Date(end_date)<=new Date(start_date)) return res.status(400).json({error:'End date must be after start date'})
+  const auction=db.insert('auctions',{name,brand,description,image_url:image_url||images[0]||'',starting_price:Number(starting_price),min_increment:Number(min_increment),start_date,end_date,enabled:enabled?1:0,manually_ended:0})
+  if(images.length>0) images.forEach((url,i)=>db.insert('auction_images',{auction_id:auction.id,url,sort_order:i}))
+  else if(image_url) db.insert('auction_images',{auction_id:auction.id,url:image_url,sort_order:0})
+  const result = fullAuction(auction)
+  res.status(201).json(result)
+
+  // ── Notify all users about new auction ──
+  const aImg = (result.images && result.images[0]) || ''
+  notificationService.createForAllUsers(notificationService.TYPES.NEW_AUCTION, {
+    auctionId: auction.id,
+    title: 'New Auction',
+    message: `${auction.name} is now available for bidding. Starting price: $${Number(auction.starting_price).toLocaleString()}.`,
+    imageUrl: aImg,
+    actionUrl: `/auction/${auction.id}`,
+    dedupKey: 'new',
+  })
+})
+
+// Admin: update auction
+app.put('/api/auctions/:id',admin,(req,res)=>{
+  const id=Number(req.params.id)
+  if(!db.byId('auctions',id)) return res.status(404).json({error:'Not found'})
+  const allowed=['name','brand','description','image_url','starting_price','min_increment','start_date','end_date','enabled']
+  const updates={}
+  allowed.forEach(f=>{
+    if(req.body[f]!==undefined){
+      if(f==='enabled') updates[f]=req.body[f]?1:0
+      else if(['starting_price','min_increment'].includes(f)) updates[f]=Number(req.body[f])
+      else updates[f]=req.body[f]
+    }
+  })
+  const oldAuction = db.byId('auctions',id)
+  const oldStartDate = oldAuction?.start_date
+  const oldEndDate = oldAuction?.end_date
+  const a=db.update('auctions',id,updates)
+  if(req.body.images){
+    db.deleteWhere('auction_images',{auction_id:id})
+    req.body.images.forEach((url,i)=>db.insert('auction_images',{auction_id:id,url,sort_order:i}))
+    db.update('auctions',id,{image_url:req.body.images[0]||''})
+  }
+  // If dates changed, clear dedup so scheduler recalculates reminders
+  if((updates.start_date && updates.start_date !== oldStartDate) || (updates.end_date && updates.end_date !== oldEndDate)){
+    notificationService.clearAuctionDedup(id, 'UPCOMING_AUCTION')
+    notificationService.clearAuctionDedup(id, 'AUCTION_ENDING')
+    notificationService.clearAuctionDedup(id, 'AUCTION_STARTED')
+  }
+  res.json(fullAuction(db.byId('auctions',id)))
+})
+
+// Admin: delete auction
+app.delete('/api/auctions/:id',admin,(req,res)=>{
+  const id=Number(req.params.id)
+  db.deleteWhere('bids',{auction_id:id})
+  db.deleteWhere('auction_winners',{auction_id:id})
+  db.deleteWhere('auction_images',{auction_id:id})
+  notificationService.cleanupAuction(id)
+  db.delete('auctions',id)
+  res.json({message:'Auction deleted'})
+})
+
+// Admin: manually end auction
+app.post('/api/auctions/:id/end',admin,(req,res)=>{
+  const id=Number(req.params.id)
+  const a=db.byId('auctions',id)
+  if(!a) return res.status(404).json({error:'Not found'})
+  db.update('auctions',id,{manually_ended:1})
+  // Select winner
+  const bids=db.all('bids',{auction_id:id}).sort((x,y)=>y.amount-x.amount)
+  if(bids.length>0&&!db.get('auction_winners',{auction_id:id})){
+    db.insert('auction_winners',{auction_id:id,user_id:bids[0].user_id,user_name:bids[0].user_name,amount:bids[0].amount})
+  }
+  const endedAuction = db.byId('auctions',id)
+  const endedImage = (db.all('auction_images',{auction_id:id}).sort((x,y)=>x.sort_order-y.sort_order)[0]||{}).url || endedAuction.image_url || ''
+  // Send winner/loser notifications
+  if(bids.length>0){
+    const winner = bids[0]
+    notificationService.create(winner.user_id, notificationService.TYPES.AUCTION_WON, {
+      auctionId: id, title: 'Congratulations! You Won!',
+      message: `You won the ${endedAuction.name} auction with a final bid of $${Number(winner.amount).toLocaleString()}!`,
+      imageUrl: endedImage, actionUrl: `/auction/${id}`, dedupKey: 'won',
+    })
+    const participantIds = [...new Set(bids.map(b=>b.user_id))]
+    for(const uid of participantIds){
+      if(uid===winner.user_id) continue
+      notificationService.create(uid, notificationService.TYPES.AUCTION_LOST, {
+        auctionId: id, title: 'Auction Ended',
+        message: `The ${endedAuction.name} auction has ended. Unfortunately, you were not the winning bidder.`,
+        imageUrl: endedImage, actionUrl: `/auction/${id}`, dedupKey: 'lost',
+      })
+    }
+  }
+  notificationService.createAdminNotification(notificationService.TYPES.ADMIN_AUCTION_ENDED, {
+    auctionId: id, title: 'Auction Manually Ended',
+    message: `${endedAuction.name} was manually ended.${bids.length>0?` Winner: ${bids[0].user_name} ($${Number(bids[0].amount).toLocaleString()})`:'No bids.'}`,
+    imageUrl: endedImage, actionUrl: '/admin', dedupKey: 'admin_ended_manual',
+  })
+  res.json(fullAuction(db.byId('auctions',id)))
+})
+
+// ════════ NOTIFICATIONS ════════
+// SSE stream endpoint
+app.get('/api/notifications/stream',(req,res)=>{
+  const token=(req.query.token||'').trim()
+  if(!token) return res.status(401).json({error:'Token required'})
+  let decoded
+  if(token==='local-admin-token'){decoded={id:1,role:'admin',name:'Admin NNG'}}
+  else{try{decoded=jwt.verify(token,SECRET)}catch{return res.status(401).json({error:'Invalid token'})}}
+  sseManager.addClient(decoded.id,res)
+})
+
+// Get user notifications
+app.get('/api/notifications',auth,(req,res)=>{
+  const{limit=30,offset=0,type=''}=req.query
+  const result=notificationService.getUserNotifications(req.user.id,{limit:Number(limit),offset:Number(offset),type})
+  res.json(result)
+})
+
+// Get unread count
+app.get('/api/notifications/unread-count',auth,(req,res)=>{
+  res.json({count:notificationService.getUnreadCount(req.user.id)})
+})
+
+// Get preferences
+app.get('/api/notifications/preferences',auth,(req,res)=>{
+  res.json(notificationService.getPreferences(req.user.id))
+})
+
+// Update preferences
+app.put('/api/notifications/preferences',auth,(req,res)=>{
+  const result=notificationService.updatePreferences(req.user.id,req.body)
+  res.json(result)
+})
+
+// Mark single notification as read
+app.patch('/api/notifications/:id/read',auth,(req,res)=>{
+  const ok=notificationService.markRead(Number(req.params.id),req.user.id)
+  if(!ok) return res.status(404).json({error:'Not found or not yours'})
+  res.json({message:'Marked as read'})
+})
+
+// Mark all as read
+app.patch('/api/notifications/read-all',auth,(req,res)=>{
+  const count=notificationService.markAllRead(req.user.id)
+  res.json({message:`Marked ${count} as read`})
+})
+
+// Delete notification
+app.delete('/api/notifications/:id',auth,(req,res)=>{
+  const ok=notificationService.deleteNotification(Number(req.params.id),req.user.id)
+  if(!ok) return res.status(404).json({error:'Not found or not yours'})
+  res.json({message:'Deleted'})
+})
+
+// Admin notifications
+app.get('/api/admin/notifications',admin,(req,res)=>{
+  const{limit=30,offset=0}=req.query
+  res.json(notificationService.getAdminNotifications(req.user.id,{limit:Number(limit),offset:Number(offset)}))
+})
+
+// Mark admin notification as read
+app.patch('/api/admin/notifications/:id/read',admin,(req,res)=>{
+  const ok=notificationService.markRead(Number(req.params.id),req.user.id)
+  if(!ok) return res.status(404).json({error:'Not found'})
+  res.json({message:'Marked as read'})
+})
+
+// Admin: manually re-announce an auction
+app.post('/api/admin/auctions/:id/announce',admin,(req,res)=>{
+  const a=db.byId('auctions',Number(req.params.id))
+  if(!a) return res.status(404).json({error:'Auction not found'})
+  const auction=fullAuction(a)
+  const img=(auction.images&&auction.images[0])||''
+  // Clear dedup for new_auction so it can be re-sent
+  notificationService.clearAuctionDedup(a.id,'NEW_AUCTION')
+  notificationService.createForAllUsers(notificationService.TYPES.NEW_AUCTION,{
+    auctionId:a.id,
+    title:'Auction Announcement',
+    message:`${a.name} is available for bidding. Starting price: $${Number(a.starting_price).toLocaleString()}.`,
+    imageUrl:img,
+    actionUrl:`/auction/${a.id}`,
+    dedupKey:'announce_'+Date.now(),
+  })
+  res.json({message:'Auction re-announced to all users'})
+})
+
+// Admin: get auction participants
+app.get('/api/admin/auctions/:id/participants',admin,(req,res)=>{
+  const participants=notificationService.getAuctionParticipants(Number(req.params.id))
+  res.json({data:participants})
+})
+
+// ── Web Push ──
+// Get VAPID public key (needed by frontend to subscribe)
+app.get('/api/notifications/push/vapid-key',(req,res)=>{
+  const key=pushService.getPublicKey()
+  if(!key) return res.status(500).json({error:'Push not configured'})
+  res.json({publicKey:key})
+})
+
+// Subscribe to push notifications
+app.post('/api/notifications/push/subscribe',auth,(req,res)=>{
+  const{subscription}=req.body
+  if(!subscription||!subscription.endpoint||!subscription.keys) return res.status(400).json({error:'Invalid subscription'})
+  pushService.saveSubscription(req.user.id,subscription)
+  res.json({message:'Push subscription saved'})
+})
+
+// Unsubscribe from push notifications
+app.post('/api/notifications/push/unsubscribe',auth,(req,res)=>{
+  const{endpoint}=req.body
+  if(!endpoint) return res.status(400).json({error:'Endpoint required'})
+  pushService.removeSubscription(req.user.id,endpoint)
+  res.json({message:'Push subscription removed'})
+})
+
+// ── Extend stats with auction data ──
+const _origStatsHandler = app._router.stack.find(l=>l.route&&l.route.path==='/api/stats'&&l.route.methods.get)
+
 // ════════ START ════════
 if(db.count('users')===0){
   const bcrypt = require('bcryptjs')
   db.insert('users',{name:'Admin NNG',email:'admin@nng.com',password:bcrypt.hashSync('admin123',10),role:'admin',phone:''})
   console.log('👤 Admin user created')
 }
+
+// Seed sample auctions if none exist
+if(db.count('auctions')===0){
+  const now=new Date()
+  const d=(days)=>new Date(now.getTime()+days*86400000).toISOString().replace('T',' ').split('.')[0]
+  db.insert('auctions',{name:'Royal Oak Offshore',brand:'Audemars Piguet',description:'The iconic Royal Oak Offshore, a masterpiece of haute horlogerie. This 42mm timepiece features a stainless steel case with a ceramic bezel, automatic movement, and the signature octagonal shape.',image_url:'https://images.unsplash.com/photo-1587836374828-4dbafa94cf0e?w=600&q=80',starting_price:15000,min_increment:500,start_date:d(-2),end_date:d(5),enabled:1,manually_ended:0})
+  db.insert('auction_images',{auction_id:1,url:'https://images.unsplash.com/photo-1587836374828-4dbafa94cf0e?w=600&q=80',sort_order:0})
+  db.insert('auction_images',{auction_id:1,url:'https://images.unsplash.com/photo-1612817159949-195b6eb9e31a?w=600&q=80',sort_order:1})
+  db.insert('auction_images',{auction_id:1,url:'https://images.unsplash.com/photo-1614164185128-e4ec99c436d7?w=600&q=80',sort_order:2})
+  db.insert('auctions',{name:'Speedmaster Moonwatch',brand:'Omega',description:'The legendary Omega Speedmaster Professional, the same model worn on the Moon. Features a 42mm stainless steel case, manual-winding calibre 1861, and a tachymeter bezel.',image_url:'https://images.unsplash.com/photo-1548171916-c8d1c4adfab3?w=600&q=80',starting_price:8000,min_increment:200,start_date:d(-1),end_date:d(3),enabled:1,manually_ended:0})
+  db.insert('auction_images',{auction_id:2,url:'https://images.unsplash.com/photo-1548171916-c8d1c4adfab3?w=600&q=80',sort_order:0})
+  db.insert('auction_images',{auction_id:2,url:'https://images.unsplash.com/photo-1622434641406-a158123450f9?w=600&q=80',sort_order:1})
+  db.insert('auctions',{name:'Nautilus 5711',brand:'Patek Philippe',description:'The legendary Patek Philippe Nautilus 5711/1A. Featuring the iconic porthole-inspired case design, this highly coveted timepiece represents the pinnacle of luxury sport watches.',image_url:'https://images.unsplash.com/photo-1627037558426-c2d07beda3af?w=600&q=80',starting_price:45000,min_increment:1000,start_date:d(2),end_date:d(12),enabled:1,manually_ended:0})
+  db.insert('auction_images',{auction_id:3,url:'https://images.unsplash.com/photo-1627037558426-c2d07beda3af?w=600&q=80',sort_order:0})
+  db.insert('auction_images',{auction_id:3,url:'https://images.unsplash.com/photo-1594534475808-b18fc33b045e?w=600&q=80',sort_order:1})
+  db.insert('auction_images',{auction_id:3,url:'https://images.unsplash.com/photo-1523170335258-f5ed11844a49?w=600&q=80',sort_order:2})
+  db.insert('auctions',{name:'Submariner Date 126610LN',brand:'Rolex',description:'The Rolex Submariner Date in Oystersteel with a black Cerachrom bezel. A reference among divers\' watches, water-resistant to 300 metres with a date display and Chromalight luminescence.',image_url:'https://images.unsplash.com/photo-1547996160-81dfa63595aa?w=600&q=80',starting_price:12000,min_increment:300,start_date:d(-10),end_date:d(-1),enabled:1,manually_ended:0})
+  db.insert('auction_images',{auction_id:4,url:'https://images.unsplash.com/photo-1547996160-81dfa63595aa?w=600&q=80',sort_order:0})
+  db.insert('auction_images',{auction_id:4,url:'https://images.unsplash.com/photo-1526045431048-f857369baa09?w=600&q=80',sort_order:1})
+  // Add some sample bids for the ended auction
+  db.insert('bids',{auction_id:4,user_id:1,user_name:'Ahmed K.',amount:12000})
+  db.insert('bids',{auction_id:4,user_id:1,user_name:'Ahmed K.',amount:13500})
+  // Add bids for live auctions
+  db.insert('bids',{auction_id:1,user_id:1,user_name:'Collector42',amount:15000})
+  db.insert('bids',{auction_id:1,user_id:1,user_name:'WatchFan',amount:15500})
+  db.insert('bids',{auction_id:1,user_id:1,user_name:'Collector42',amount:16000})
+  db.insert('bids',{auction_id:2,user_id:1,user_name:'SpeedKing',amount:8000})
+  db.insert('bids',{auction_id:2,user_id:1,user_name:'MoonLover',amount:8200})
+  console.log('🔨 Sample auctions seeded')
+}
+// ════════ PRODUCTION: serve frontend ════════
+const frontendDist = path.join(__dirname, '..', 'frontend', 'dist')
+if (fs.existsSync(frontendDist)) {
+  console.log(`🌐 Serving frontend from ${frontendDist}`)
+  app.use(express.static(frontendDist))
+  // SPA fallback — send index.html for any non-API, non-upload route
+  app.get('*', (req, res) => {
+    if (req.path.startsWith('/api/') || req.path.startsWith('/uploads/')) return res.status(404).json({error:'Not found'})
+    res.sendFile(path.join(frontendDist, 'index.html'))
+  })
+} else {
+  console.log('⚠️  Frontend dist/ not found — API-only mode (use Vite dev server for frontend)')
+}
+
 app.listen(PORT,()=>{
   console.log(`\n🚀 NNG Backend running on http://localhost:${PORT}`)
-  console.log(`📦 Products: ${db.count('products')} | Slides: ${db.count('hero_slides')}`)
-  console.log(`👤 Admin: admin@nng.com / admin123\n`)
+  console.log(`📦 Products: ${db.count('products')} | Slides: ${db.count('hero_slides')} | Auctions: ${db.count('auctions')}`)
+  console.log(`👤 Users: ${db.count('users')} | Orders: ${db.count('orders')}`)
+  if (process.env.DB_PATH) console.log(`💾 Persistent DB: ${process.env.DB_PATH}`)
+  if (process.env.UPLOADS_PATH) console.log(`💾 Persistent uploads: ${process.env.UPLOADS_PATH}`)
+  console.log(`🔔 Notifications: ${db.count('notifications')}`)
+
+  // Start the auction scheduler
+  scheduler.start(db, notificationService, sseManager)
+  console.log('')
 })

@@ -2,15 +2,38 @@ const fs   = require('fs')
 const path = require('path')
 
 const DB_FILE = process.env.DB_PATH || path.join(__dirname, 'nng-data.json')
+
+// Ensure DB directory exists (important for Railway Volume mount paths like /data/)
+const dbDir = path.dirname(DB_FILE)
+if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true })
+
 const DEFAULT = {
   users: [], brands: [], categories: [], products: [],
   product_images: [], orders: [], order_items: [],
   hero_slides: [],
-  _counters: { users:0, brands:0, categories:0, products:0, product_images:0, orders:0, order_items:0, hero_slides:0 }
+  auctions: [], bids: [], auction_winners: [], auction_images: [],
+  notifications: [], notification_dedup: [], notification_preferences: [],
+  push_subscriptions: [],
+  _counters: { users:0, brands:0, categories:0, products:0, product_images:0, orders:0, order_items:0, hero_slides:0, auctions:0, bids:0, auction_winners:0, auction_images:0, notifications:0, notification_dedup:0, notification_preferences:0, push_subscriptions:0 }
 }
 
-let state = fs.existsSync(DB_FILE)
-  ? (() => { try { const d = JSON.parse(fs.readFileSync(DB_FILE,'utf8')); if (!d.hero_slides) { d.hero_slides = []; d._counters.hero_slides = 0 } return d } catch { return {...DEFAULT} } })()
+const dbExists = fs.existsSync(DB_FILE)
+console.log(`📂 DB path: ${DB_FILE} (${dbExists ? 'FOUND — loading existing data' : 'NOT FOUND — starting fresh'})`)
+
+let state = dbExists
+  ? (() => { try {
+      const d = JSON.parse(fs.readFileSync(DB_FILE,'utf8'))
+      if (!d.hero_slides) { d.hero_slides = []; d._counters.hero_slides = 0 }
+      if (!d.auctions) { d.auctions = []; d._counters.auctions = 0 }
+      if (!d.bids) { d.bids = []; d._counters.bids = 0 }
+      if (!d.auction_winners) { d.auction_winners = []; d._counters.auction_winners = 0 }
+      if (!d.auction_images) { d.auction_images = []; d._counters.auction_images = 0 }
+      if (!d.notifications) { d.notifications = []; d._counters.notifications = 0 }
+      if (!d.notification_dedup) { d.notification_dedup = []; d._counters.notification_dedup = 0 }
+      if (!d.notification_preferences) { d.notification_preferences = []; d._counters.notification_preferences = 0 }
+      if (!d.push_subscriptions) { d.push_subscriptions = []; d._counters.push_subscriptions = 0 }
+      return d
+    } catch(e) { console.error('⚠️ Failed to parse DB file, starting fresh:', e.message); return {...DEFAULT} } })()
   : {...DEFAULT}
 
 function save() { fs.writeFileSync(DB_FILE, JSON.stringify(state,null,2),'utf8') }

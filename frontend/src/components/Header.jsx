@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ShoppingBag, Heart, Search, Menu, X, Globe, User, LogOut, Shield } from 'lucide-react'
 import { useStore } from '../context/StoreContext'
+import NotificationBell from './NotificationBell'
 
 export default function Header() {
   const { t, lang, setLang, dir, cartCount, setCartOpen, setSearchOpen, user, isAdmin, logout, setAuthOpen, wishlist } = useStore()
@@ -30,6 +31,7 @@ export default function Header() {
     { label: t.home,    path: '/' },
     { label: t.shop,    path: '/shop' },
     { label: t.brands,  path: '/brands' },
+    { label: t.auctions, path: '/auctions' },
     // { label: t.about,   path: '/about' },
     { label: t.contact, path: '/contact' },
   ]
@@ -120,6 +122,8 @@ export default function Header() {
                 <Heart size={18} />
                 {wishlist.length > 0 && <span className="badge">{wishlist.length}</span>}
               </button>
+
+              {user && <NotificationBell />}
 
               <button className="btn-ghost" style={{ ...iconBtn, position: 'relative' }} onClick={() => setCartOpen(true)}>
                 <ShoppingBag size={18} />

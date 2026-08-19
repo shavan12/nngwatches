@@ -2,5 +2,6 @@ node_modules/
 nng-data.json
 .env
 backend/uploads/*
+backend/vapid-keys.json
 frontend/dist/
 .DS_Store

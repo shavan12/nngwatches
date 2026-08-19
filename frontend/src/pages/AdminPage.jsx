@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Package, ShoppingCart, Users, Tag, Award,
   Plus, Edit2, Trash2, X, Menu, Check, ArrowLeft,
   Upload, RefreshCcw, AlertCircle, ChevronDown, LogOut,
-  TrendingUp, DollarSign, Box, ClipboardList, Image
+  TrendingUp, DollarSign, Box, ClipboardList, Image, Gavel, Timer, StopCircle, Trophy, Bell, Megaphone
 } from 'lucide-react'
 import { useStore } from '../context/StoreContext'
 import SlidesManager from "../components/SlidesManager";
@@ -337,6 +337,165 @@ function OrderCard({ order, onStatusChange }) {
   )
 }
 
+// ── Auction modal ─────────────────────────────────
+function AuctionModal({ initial, isEdit, onClose, onSave, uploadImage, t }) {
+  const [form, setForm] = useState(initial)
+  const [uploading, setUploading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const set = (k, v) => setForm(f => ({...f, [k]:v}))
+
+  const handleUpload = async (e) => {
+    const file = e.target.files[0]; if (!file) return
+    setUploading(true)
+    try { const url = await uploadImage(file); set('images', [...form.images, url]) }
+    catch (err) { setError('Upload failed: ' + err.message) }
+    finally { setUploading(false) }
+  }
+
+  const handleSubmit = async (e) => {
+    e?.preventDefault(); setSaving(true); setError('')
+    try {
+      await onSave({
+        ...form,
+        starting_price: parseFloat(form.starting_price),
+        min_increment: parseFloat(form.min_increment),
+      })
+    } catch (err) { setError(err.message) }
+    finally { setSaving(false) }
+  }
+
+  const inputStyle = {width:'100%',padding:'11px 14px',background:'var(--bg-elevated)',border:'1px solid var(--border-subtle)',borderRadius:'var(--radius-sm)',color:'var(--text-primary)',fontSize:'16px',outline:'none',fontFamily:'var(--font-body)'}
+
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',zIndex:1000,display:'flex',flexDirection:'column',animation:'fadeIn 0.2s ease'}}>
+      {/* Header */}
+      <div style={{display:'flex',alignItems:'center',gap:12,padding:'16px 20px',background:'var(--bg-secondary)',borderBottom:'1px solid var(--border-subtle)',flexShrink:0}}>
+        <button onClick={onClose} style={{width:36,height:36,borderRadius:'50%',background:'var(--bg-elevated)',border:'1px solid var(--border-subtle)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',color:'var(--text-secondary)'}}>
+          <X size={16}/>
+        </button>
+        <h2 style={{fontFamily:'var(--font-display)',fontSize:'1.2rem',fontWeight:300,flex:1}}>{isEdit?(t.editAuction||'Edit Auction'):(t.createAuction||'Create Auction')}</h2>
+        <button type="button" onClick={handleSubmit} className="btn btn-gold" style={{padding:'9px 20px',fontSize:'0.68rem'}} disabled={saving}>
+          {saving ? 'Saving...' : (t.save||'Save')}
+        </button>
+      </div>
+
+      {/* Scrollable form */}
+      <form onSubmit={handleSubmit} style={{flex:1,overflowY:'auto',padding:'20px',display:'grid',gap:16}}>
+        {error && (
+          <div style={{padding:'10px 14px',background:'rgba(224,68,68,0.08)',border:'1px solid rgba(224,68,68,0.25)',borderRadius:'var(--radius-sm)',fontSize:'0.78rem',color:'#e04444',display:'flex',gap:8,alignItems:'center'}}>
+            <AlertCircle size={14}/>{error}
+          </div>
+        )}
+
+        <Field label={`${t.auctionName||'Watch Name'} *`}>
+          <input style={inputStyle} value={form.name} onChange={e=>set('name',e.target.value)} placeholder="Royal Oak Offshore" required/>
+        </Field>
+
+        <Field label={t.auctionBrand||'Brand'}>
+          <input style={inputStyle} value={form.brand} onChange={e=>set('brand',e.target.value)} placeholder="Audemars Piguet"/>
+        </Field>
+
+        <Field label={t.auctionDescription||'Description'}>
+          <textarea style={{...inputStyle,resize:'vertical',minHeight:80}} rows={3} value={form.description} onChange={e=>set('description',e.target.value)}/>
+        </Field>
+
+        {/* Images */}
+        <div>
+          <Label>{t.auctionImage||'Images'}</Label>
+
+          {/* Image preview thumbnails */}
+          {form.images.length > 0 && (
+            <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:14}}>
+              {form.images.map((url,i) => (
+                <div key={i} style={{position:'relative',width:72,height:72,borderRadius:'var(--radius-sm)',overflow:'hidden',border:'1px solid var(--border-subtle)'}}>
+                  <img src={url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                  <div style={{position:'absolute',bottom:0,left:0,right:0,padding:'2px 0',background:'rgba(0,0,0,0.7)',color:'white',fontSize:'0.58rem',textAlign:'center',fontWeight:600}}>
+                    {i===0 ? 'MAIN' : `#${i+1}`}
+                  </div>
+                  <button type="button" onClick={()=>set('images',form.images.filter((_,j)=>j!==i))}
+                    style={{position:'absolute',top:3,right:3,width:20,height:20,borderRadius:'50%',background:'rgba(0,0,0,0.8)',color:'white',display:'flex',alignItems:'center',justifyContent:'center',border:'none',cursor:'pointer'}}>
+                    <X size={10}/>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Individual URL inputs - one per image */}
+          <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:10}}>
+            {form.images.map((url,i) => (
+              <div key={i} style={{display:'flex',gap:8,alignItems:'center'}}>
+                <span style={{fontSize:'0.65rem',fontWeight:600,color:'var(--text-muted)',width:50,flexShrink:0}}>
+                  {i===0 ? 'MAIN' : `IMG ${i+1}`}
+                </span>
+                <input
+                  style={{...inputStyle,flex:1}}
+                  value={url}
+                  onChange={e=>set('images',form.images.map((u,j)=>j===i?e.target.value:u))}
+                  placeholder="https://..."
+                />
+                <button type="button" onClick={()=>set('images',form.images.filter((_,j)=>j!==i))}
+                  style={{width:36,height:36,borderRadius:'var(--radius-sm)',border:'1px solid rgba(224,68,68,0.3)',background:'rgba(224,68,68,0.05)',color:'#e04444',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                  <X size={14}/>
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {/* Add buttons row */}
+          <div style={{display:'flex',gap:8}}>
+            <button type="button" onClick={()=>set('images',[...form.images,''])}
+              style={{flex:1,padding:'10px',borderRadius:'var(--radius-sm)',border:'1px dashed var(--border)',background:'var(--bg-elevated)',color:'var(--text-secondary)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6,fontSize:'0.72rem',fontWeight:500}}>
+              <Plus size={14}/> Add Image URL
+            </button>
+            <label style={{flex:1,padding:'10px',borderRadius:'var(--radius-sm)',border:'1px dashed var(--border)',background:'var(--bg-elevated)',color:'var(--text-secondary)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6,fontSize:'0.72rem',fontWeight:500}}>
+              {uploading ? <RefreshCcw size={14} style={{animation:'spin 0.6s linear infinite',color:'var(--gold)'}}/> : <Upload size={14}/>}
+              {uploading ? 'Uploading...' : 'Upload File'}
+              <input type="file" accept="image/*" onChange={handleUpload} style={{display:'none'}}/>
+            </label>
+          </div>
+        </div>
+
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+          <Field label={`${t.startingPrice||'Starting Price'} ($) *`}>
+            <input style={inputStyle} type="number" step="0.01" min="0" value={form.starting_price} onChange={e=>set('starting_price',e.target.value)} placeholder="5000" required/>
+          </Field>
+          <Field label={`${t.minIncrement||'Min Increment'} ($)`}>
+            <input style={inputStyle} type="number" step="0.01" min="1" value={form.min_increment} onChange={e=>set('min_increment',e.target.value)} placeholder="50"/>
+          </Field>
+        </div>
+
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+          <Field label={`${t.auctionStartDate||'Start Date'} *`}>
+            <input style={inputStyle} type="datetime-local" value={form.start_date} onChange={e=>set('start_date',e.target.value)} required/>
+          </Field>
+          <Field label={`${t.auctionEndDate||'End Date'} *`}>
+            <input style={inputStyle} type="datetime-local" value={form.end_date} onChange={e=>set('end_date',e.target.value)} required/>
+          </Field>
+        </div>
+
+        {/* Enabled toggle */}
+        <button type="button" onClick={()=>set('enabled',!form.enabled)} style={{
+          padding:'12px 16px', borderRadius:'var(--radius-sm)', cursor:'pointer',
+          border:`1px solid ${form.enabled?'var(--gold)':'var(--border-subtle)'}`,
+          background: form.enabled ? 'var(--gold-muted)' : 'var(--bg-elevated)',
+          color: form.enabled ? 'var(--gold)' : 'var(--text-muted)',
+          fontSize:'0.72rem', fontWeight:500, display:'flex',
+          alignItems:'center', gap:10, transition:'var(--transition)',
+        }}>
+          <div style={{width:20,height:20,borderRadius:4,border:`1px solid ${form.enabled?'var(--gold)':'var(--border-subtle)'}`,display:'flex',alignItems:'center',justifyContent:'center'}}>
+            {form.enabled && <Check size={12} style={{color:'var(--gold)'}}/>}
+          </div>
+          {t.auctionEnabled||'Enabled'}
+        </button>
+
+        <div style={{height:16}}/>
+      </form>
+    </div>
+  )
+}
+
 // ── Main Admin component ──────────────────────────────────
 export default function AdminPage() {
   const {
@@ -344,7 +503,9 @@ export default function AdminPage() {
     brands, categories, loadBrands, loadCategories,
     createProduct, updateProduct, deleteProduct,
     orders, loadOrders, updateOrderStatus,
-    stats, loadStats, addBrand, deleteBrand, addCategory, deleteCategory, uploadImage
+    stats, loadStats, addBrand, deleteBrand, addCategory, deleteCategory, uploadImage,
+    auctions, auctionsLoading, loadAdminAuctions, createAuction, updateAuction, deleteAuction, endAuction,
+    api, addToast
   } = useStore()
 
   const navigate    = useNavigate()
@@ -354,8 +515,12 @@ export default function AdminPage() {
   const [searchQ, setSearchQ]         = useState('')
   const [newBrand, setNewBrand]       = useState('')
   const [newCategory, setNewCategory] = useState({slug:'',name_en:'',name_ar:''})
+  const [auctionModal, setAuctionModal] = useState(null)
+  const [deleteAuctionConfirm, setDeleteAuctionConfirm] = useState(null)
   const [isMobile, setIsMobile]       = useState(window.innerWidth < 768)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [adminNotifs, setAdminNotifs] = useState([])
+  const [adminNotifsLoading, setAdminNotifsLoading] = useState(false)
 
   // Auth check
   const [authChecked, setAuthChecked] = useState(false)
@@ -376,9 +541,33 @@ export default function AdminPage() {
     loadCategories()
   }, [])
 
+  const loadAdminNotifs = async () => {
+    setAdminNotifsLoading(true)
+    try {
+      const res = await api('/admin/notifications?limit=50')
+      setAdminNotifs(res.data || [])
+    } catch {} finally { setAdminNotifsLoading(false) }
+  }
+
+  const markAdminNotifRead = async (id) => {
+    try {
+      await api(`/admin/notifications/${id}/read`, { method: 'PATCH' })
+      setAdminNotifs(prev => prev.map(n => n.id === id ? {...n, is_read: 1} : n))
+    } catch {}
+  }
+
+  const announceAuction = async (auctionId) => {
+    try {
+      await api(`/admin/auctions/${auctionId}/announce`, { method: 'POST' })
+      addToast('Auction re-announced to all users')
+    } catch { addToast('Failed to announce', 'error') }
+  }
+
   useEffect(() => {
     if (section === 'dashboard') loadStats()
     if (section === 'orders')    loadOrders()
+    if (section === 'auctions')  loadAdminAuctions()
+    if (section === 'notifications') loadAdminNotifs()
   }, [section])
 
   const navItems = [
@@ -388,6 +577,8 @@ export default function AdminPage() {
     { id:'orders',    icon:ShoppingCart,    label:'Orders',     badge:orders.filter(o=>o.status==='pending').length },
     { id:'brands',    icon:Award,           label:'Brands' },
     { id:'categories',icon:Tag,             label:'Categories' },
+    { id:'auctions',  icon:Gavel,           label:t.adminAuctions||'Auctions', badge:auctions.filter(a=>a.status==='live').length },
+    { id:'notifications', icon:Bell,         label:'Notifications', badge:adminNotifs.filter(n=>!n.is_read).length },
   ]
 
   const filtered = products.filter(p =>
@@ -471,6 +662,7 @@ export default function AdminPage() {
               <StatCard icon={ClipboardList} label="Orders"    value={stats?.total_orders??orders.length}    color='#3b82f6'/>
               <StatCard icon={Users}         label="Customers" value={stats?.total_users??0}                  color='#8b5cf6'/>
               <StatCard icon={DollarSign}    label="Revenue"   value={`$${Number(stats?.total_revenue??0).toLocaleString()}`} color='#4cc9a8'/>
+              <StatCard icon={Gavel}          label={t.adminAuctions||'Auctions'} value={stats?.active_auctions??0} color='#f59e0b'/>
             </div>
 
             {stats?.recent_orders?.length > 0 && (
@@ -619,6 +811,122 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+
+        {/* ── AUCTIONS ── */}
+        {section==='auctions' && (
+          <div style={{animation:'fadeInUp 0.4s ease'}}>
+            <div style={{display:'flex',gap:10,marginBottom:16,flexWrap:'wrap'}}>
+              <button className="btn btn-gold" style={{padding:'10px 16px',fontSize:'0.7rem',whiteSpace:'nowrap'}} onClick={()=>setAuctionModal('new')}>
+                <Plus size={14}/> {t.createAuction||'Create Auction'}
+              </button>
+            </div>
+
+            {auctionsLoading && <div style={{textAlign:'center',padding:40,color:'var(--text-muted)'}}>Loading...</div>}
+
+            <div style={{display:'flex',flexDirection:'column',gap:12}}>
+              {auctions.map(a => {
+                const statusColors = {live:'#4cc9a8',upcoming:'#3b82f6',ended:'#888'}
+                const sc = statusColors[a.status]||'#888'
+                return (
+                  <div key={a.id} style={{background:'var(--bg-card)',border:'1px solid var(--border-subtle)',borderRadius:'var(--radius-md)',overflow:'hidden'}}>
+                    <div style={{display:'flex',gap:14,padding:'14px 16px',alignItems:'center'}}>
+                      {/* Thumbnail */}
+                      <div style={{width:56,height:56,borderRadius:'var(--radius-sm)',overflow:'hidden',flexShrink:0,background:'var(--bg-secondary)'}}>
+                        <img src={(a.images&&a.images[0])||a.image_url||'https://images.unsplash.com/photo-1547996160-81dfa63595aa?w=100&q=60'} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                      </div>
+                      {/* Info */}
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4,flexWrap:'wrap'}}>
+                          <span style={{fontSize:'0.85rem',fontWeight:500,color:'var(--text-primary)'}}>{a.name}</span>
+                          <span style={{padding:'2px 8px',borderRadius:12,fontSize:'0.55rem',fontWeight:700,letterSpacing:'0.06em',textTransform:'uppercase',background:`${sc}20`,color:sc,border:`1px solid ${sc}40`}}>
+                            {a.status==='live'?t.auctionLive:a.status==='upcoming'?t.auctionUpcoming:t.auctionEnded}
+                          </span>
+                          {!a.enabled && <span style={{padding:'2px 8px',borderRadius:12,fontSize:'0.55rem',fontWeight:700,background:'rgba(224,68,68,0.1)',color:'#e04444',border:'1px solid rgba(224,68,68,0.3)'}}>Disabled</span>}
+                        </div>
+                        <div style={{fontSize:'0.65rem',color:'var(--text-muted)'}}>
+                          {a.brand} · {t.highestBid||'Highest Bid'}: <span style={{color:'var(--gold)',fontWeight:600}}>${Number(a.current_highest_bid||a.starting_price).toLocaleString()}</span> · {a.bid_count||0} {t.bidders||'bids'} · {a.bidder_count||0} {t.bidders||'bidders'}
+                        </div>
+                        {a.winner && (
+                          <div style={{fontSize:'0.62rem',color:'var(--gold)',marginTop:3}}>
+                            <Trophy size={10} style={{display:'inline',verticalAlign:'middle',marginRight:4}}/> {t.auctionWinner||'Winner'}: {a.winner.user_name} — ${Number(a.winner.amount).toLocaleString()}
+                          </div>
+                        )}
+                      </div>
+                      {/* Actions */}
+                      <div style={{display:'flex',gap:6,flexShrink:0}}>
+                        {a.status==='live' && (
+                          <button onClick={()=>endAuction(a.id)} title={t.endAuction||'End Auction'} style={{width:34,height:34,borderRadius:'var(--radius-sm)',border:'1px solid rgba(245,158,11,0.3)',background:'rgba(245,158,11,0.05)',color:'#f59e0b',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                            <StopCircle size={13}/>
+                          </button>
+                        )}
+                        <button onClick={()=>setAuctionModal(a)} style={{width:34,height:34,borderRadius:'var(--radius-sm)',border:'1px solid var(--border-subtle)',background:'var(--bg-elevated)',color:'var(--text-secondary)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                          <Edit2 size={13}/>
+                        </button>
+                        <button onClick={()=>setDeleteAuctionConfirm(a)} style={{width:34,height:34,borderRadius:'var(--radius-sm)',border:'1px solid rgba(224,68,68,0.3)',background:'rgba(224,68,68,0.05)',color:'#e04444',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                          <Trash2 size={13}/>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+              {!auctionsLoading && auctions.length===0 && <div style={{textAlign:'center',padding:40,color:'var(--text-muted)',fontSize:'0.85rem'}}>{t.noAuctions||'No auctions yet'}</div>}
+            </div>
+          </div>
+        )}
+
+        {section==='notifications' && (
+          <div>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+              <h2 style={{fontFamily:'var(--font-display)',fontSize:'1.3rem',fontWeight:400}}>Admin Notifications</h2>
+              <button className="btn btn-outline" style={{fontSize:'0.65rem',padding:'8px 14px'}} onClick={loadAdminNotifs}>
+                <RefreshCcw size={14}/> Refresh
+              </button>
+            </div>
+            {adminNotifsLoading && <div style={{textAlign:'center',padding:40,color:'var(--text-muted)'}}>Loading...</div>}
+            <div className="admin-notif-list">
+              {adminNotifs.map(notif => (
+                <div key={notif.id} className={`admin-notif-item ${notif.is_read ? '' : 'unread'}`} onClick={() => markAdminNotifRead(notif.id)}>
+                  <div style={{width:36,height:36,borderRadius:'50%',background:'var(--gold-muted)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,color:'var(--gold)'}}>
+                    {notif.type==='ADMIN_NEW_BID' ? <TrendingUp size={16}/> : notif.type==='ADMIN_AUCTION_STARTED' ? <Megaphone size={16}/> : <Gavel size={16}/>}
+                  </div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:'0.78rem',fontWeight:600,color:'var(--text-primary)',marginBottom:2}}>{notif.title}</div>
+                    <div style={{fontSize:'0.7rem',color:'var(--text-secondary)',lineHeight:1.4}}>{notif.message}</div>
+                    <div style={{fontSize:'0.6rem',color:'var(--text-muted)',marginTop:4}}>{notif.created_at}</div>
+                  </div>
+                  {!notif.is_read && <div style={{width:8,height:8,borderRadius:'50%',background:'var(--gold)',flexShrink:0,marginTop:6}}/>}
+                </div>
+              ))}
+              {!adminNotifsLoading && adminNotifs.length===0 && (
+                <div style={{textAlign:'center',padding:40,color:'var(--text-muted)',fontSize:'0.8rem'}}>
+                  <Bell size={32} strokeWidth={1} style={{marginBottom:8,opacity:0.5}}/>
+                  <div>No admin notifications yet</div>
+                </div>
+              )}
+            </div>
+
+            {/* Re-announce section */}
+            {auctions.length > 0 && (
+              <div style={{marginTop:32}}>
+                <h3 style={{fontSize:'0.75rem',fontWeight:600,letterSpacing:'0.08em',textTransform:'uppercase',color:'var(--gold)',marginBottom:12}}>Re-announce Auctions</h3>
+                <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                  {auctions.filter(a=>a.status!=='ended').map(a => (
+                    <div key={a.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 16px',background:'var(--bg-card)',border:'1px solid var(--border-subtle)',borderRadius:'var(--radius-md)'}}>
+                      <div>
+                        <div style={{fontSize:'0.78rem',fontWeight:500,color:'var(--text-primary)'}}>{a.name}</div>
+                        <div style={{fontSize:'0.65rem',color:'var(--text-muted)',textTransform:'uppercase'}}>{a.status}</div>
+                      </div>
+                      <button className="btn btn-outline" style={{fontSize:'0.6rem',padding:'6px 12px'}} onClick={()=>announceAuction(a.id)}>
+                        <Megaphone size={12}/> Announce
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Mobile bottom navigation ── */}
@@ -654,6 +962,51 @@ export default function AdminPage() {
               <button style={{flex:1,padding:'12px',background:'#e04444',color:'white',borderRadius:'var(--radius-sm)',fontSize:'0.72rem',fontWeight:600,letterSpacing:'0.1em',textTransform:'uppercase',cursor:'pointer',border:'none'}}
                 onClick={async()=>{await deleteProduct(deleteConfirm.id);setDeleteConfirm(null)}}>
                 Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Auction modal ── */}
+      {auctionModal && (() => {
+        const isEdit = auctionModal !== 'new'
+        const initial = isEdit ? {
+          name: auctionModal.name||'', brand: auctionModal.brand||'', description: auctionModal.description||'',
+          images: auctionModal.images||[], starting_price: auctionModal.starting_price||'',
+          min_increment: auctionModal.min_increment||50, start_date: auctionModal.start_date?.slice(0,16)||'',
+          end_date: auctionModal.end_date?.slice(0,16)||'', enabled: auctionModal.enabled!==0,
+        } : {
+          name:'', brand:'', description:'', images:['https://images.unsplash.com/photo-1547996160-81dfa63595aa?w=600&q=80'],
+          starting_price:'', min_increment:50, start_date:'', end_date:'', enabled:true,
+        }
+        return <AuctionModal key={isEdit?auctionModal.id:'new'} initial={initial} isEdit={isEdit}
+          uploadImage={uploadImage} t={t}
+          onClose={()=>setAuctionModal(null)}
+          onSave={async (data)=>{
+            if(isEdit) await updateAuction(auctionModal.id, data)
+            else await createAuction(data)
+            setAuctionModal(null)
+          }}
+        />
+      })()}
+
+      {/* ── Delete auction confirm ── */}
+      {deleteAuctionConfirm && (
+        <div className="modal-overlay">
+          <div className="modal-box" style={{maxWidth:340,padding:28,textAlign:'center',margin:16}}>
+            <div style={{width:52,height:52,borderRadius:'50%',background:'rgba(224,68,68,0.1)',border:'1px solid rgba(224,68,68,0.3)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 16px'}}>
+              <Trash2 size={22} style={{color:'#e04444'}}/>
+            </div>
+            <h3 style={{fontFamily:'var(--font-display)',fontSize:'1.2rem',marginBottom:8}}>{t.deleteAuction||'Delete Auction?'}</h3>
+            <p style={{fontSize:'0.8rem',color:'var(--text-muted)',marginBottom:24}}>
+              This will permanently delete <strong style={{color:'var(--text-primary)'}}>{deleteAuctionConfirm.name}</strong> and all its bids.
+            </p>
+            <div style={{display:'flex',gap:12}}>
+              <button className="btn btn-outline" style={{flex:1,padding:'12px'}} onClick={()=>setDeleteAuctionConfirm(null)}>{t.cancel||'Cancel'}</button>
+              <button style={{flex:1,padding:'12px',background:'#e04444',color:'white',borderRadius:'var(--radius-sm)',fontSize:'0.72rem',fontWeight:600,letterSpacing:'0.1em',textTransform:'uppercase',cursor:'pointer',border:'none'}}
+                onClick={async()=>{await deleteAuction(deleteAuctionConfirm.id);setDeleteAuctionConfirm(null)}}>
+                {t.delete||'Delete'}
               </button>
             </div>
           </div>

@@ -4,6 +4,7 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useRef,
 } from "react";
 
 const StoreContext = createContext();
@@ -155,6 +156,48 @@ export const translations = {
     register: "Register",
     registerTitle: "Create Account",
     registerName: "Full Name",
+    auctions: "Auctions",
+    auctionLive: "Live",
+    auctionUpcoming: "Upcoming",
+    auctionEnded: "Ended",
+    currentBid: "Current Bid",
+    startingPrice: "Starting Price",
+    minIncrement: "Min Increment",
+    placeBid: "Place Bid",
+    bidHistory: "Bid History",
+    bidders: "Bidders",
+    noBidsYet: "No bids yet",
+    auctionWinner: "Winner",
+    timeRemaining: "Time Remaining",
+    auctionStartsIn: "Starts In",
+    bidTooLow: "Bid must be at least",
+    bidSuccess: "Bid placed successfully!",
+    loginToBid: "Sign in to place a bid",
+    auctionEndedMsg: "This auction has ended",
+    days: "Days",
+    hours: "Hours",
+    minutes: "Minutes",
+    seconds: "Seconds",
+    yourBid: "Your Bid",
+    adminAuctions: "Auctions",
+    createAuction: "Create Auction",
+    editAuction: "Edit Auction",
+    deleteAuction: "Delete Auction",
+    auctionName: "Watch Name",
+    auctionBrand: "Brand",
+    auctionDescription: "Description",
+    auctionImage: "Image",
+    auctionStartDate: "Start Date",
+    auctionEndDate: "End Date",
+    auctionEnabled: "Enabled",
+    highestBid: "Highest Bid",
+    endAuction: "End Auction",
+    viewAllAuctions: "View All Auctions",
+    noAuctions: "No auctions available",
+    congratsWinner: "Congratulations to the winner!",
+    allAuctions: "All",
+    auctionNotStarted: "Auction hasn't started yet",
+    enterBidAmount: "Enter bid amount",
   },
   ar: {
     brand: "NNG",
@@ -278,6 +321,48 @@ export const translations = {
     register: "إنشاء حساب",
     registerTitle: "إنشاء حساب",
     registerName: "الاسم الكامل",
+    auctions: "المزادات",
+    auctionLive: "مباشر",
+    auctionUpcoming: "قادم",
+    auctionEnded: "انتهى",
+    currentBid: "المزايدة الحالية",
+    startingPrice: "سعر البداية",
+    minIncrement: "الحد الأدنى للزيادة",
+    placeBid: "قدّم مزايدة",
+    bidHistory: "سجل المزايدات",
+    bidders: "المزايدون",
+    noBidsYet: "لا توجد مزايدات بعد",
+    auctionWinner: "الفائز",
+    timeRemaining: "الوقت المتبقي",
+    auctionStartsIn: "يبدأ خلال",
+    bidTooLow: "يجب أن تكون المزايدة على الأقل",
+    bidSuccess: "تم تقديم المزايدة بنجاح!",
+    loginToBid: "سجّل الدخول لتقديم مزايدة",
+    auctionEndedMsg: "انتهى هذا المزاد",
+    days: "أيام",
+    hours: "ساعات",
+    minutes: "دقائق",
+    seconds: "ثوانٍ",
+    yourBid: "مزايدتك",
+    adminAuctions: "المزادات",
+    createAuction: "إنشاء مزاد",
+    editAuction: "تعديل المزاد",
+    deleteAuction: "حذف المزاد",
+    auctionName: "اسم الساعة",
+    auctionBrand: "الماركة",
+    auctionDescription: "الوصف",
+    auctionImage: "الصورة",
+    auctionStartDate: "تاريخ البداية",
+    auctionEndDate: "تاريخ النهاية",
+    auctionEnabled: "مفعّل",
+    highestBid: "أعلى مزايدة",
+    endAuction: "إنهاء المزاد",
+    viewAllAuctions: "عرض جميع المزادات",
+    noAuctions: "لا توجد مزادات متاحة",
+    congratsWinner: "مبروك للفائز!",
+    allAuctions: "الكل",
+    auctionNotStarted: "لم يبدأ المزاد بعد",
+    enterBidAmount: "أدخل مبلغ المزايدة",
   },
 };
 
@@ -317,6 +402,11 @@ export function StoreProvider({ children }) {
   const [categories, setCategories] = useState([]);
   const [orders, setOrders] = useState([]);
   const [stats, setStats] = useState(null);
+  const [auctions, setAuctions] = useState([]);
+  const [auctionsLoading, setAuctionsLoading] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const sseRef = useRef(null);
 
   const t = translations[lang];
   const dir = lang === "ar" ? "rtl" : "ltr";
@@ -634,6 +724,278 @@ export function StoreProvider({ children }) {
 
   const api = useCallback(apiFetch, []);
 
+  // ── Auction CRUD ─────────────────────────────────────────
+  const loadAuctions = useCallback(async (params = {}) => {
+    setAuctionsLoading(true);
+    try {
+      const qs = new URLSearchParams(params).toString();
+      const res = await apiFetch(`/auctions${qs ? "?" + qs : ""}`);
+      setAuctions(res.data ?? []);
+    } catch (e) {
+      addToast(e.message, "error");
+    } finally {
+      setAuctionsLoading(false);
+    }
+  }, [addToast]);
+
+  const loadAdminAuctions = useCallback(async () => {
+    setAuctionsLoading(true);
+    try {
+      const res = await apiFetch("/auctions/admin/all");
+      setAuctions(res.data ?? []);
+    } catch (e) {
+      addToast(e.message, "error");
+    } finally {
+      setAuctionsLoading(false);
+    }
+  }, [addToast]);
+
+  const createAuction = useCallback(
+    async (data) => {
+      const res = await apiFetch("/auctions", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+      await loadAdminAuctions();
+      addToast("Auction created");
+      return res;
+    },
+    [loadAdminAuctions, addToast],
+  );
+
+  const updateAuction = useCallback(
+    async (id, data) => {
+      const res = await apiFetch(`/auctions/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      });
+      await loadAdminAuctions();
+      addToast("Auction updated");
+      return res;
+    },
+    [loadAdminAuctions, addToast],
+  );
+
+  const deleteAuction = useCallback(
+    async (id) => {
+      await apiFetch(`/auctions/${id}`, { method: "DELETE" });
+      await loadAdminAuctions();
+      addToast("Auction deleted");
+    },
+    [loadAdminAuctions, addToast],
+  );
+
+  const endAuction = useCallback(
+    async (id) => {
+      await apiFetch(`/auctions/${id}/end`, { method: "POST" });
+      await loadAdminAuctions();
+      addToast("Auction ended");
+    },
+    [loadAdminAuctions, addToast],
+  );
+
+  const placeBid = useCallback(
+    async (auctionId, amount) => {
+      const res = await apiFetch(`/auctions/${auctionId}/bid`, {
+        method: "POST",
+        body: JSON.stringify({ amount }),
+      });
+      return res;
+    },
+    [],
+  );
+
+  // ── Notifications ─────────────────────────────────────────
+  const fetchNotifications = useCallback(async (params = {}) => {
+    try {
+      const qs = new URLSearchParams(params).toString();
+      const res = await apiFetch(`/notifications${qs ? "?" + qs : ""}`);
+      if (Number(params.offset) > 0) {
+        setNotifications((prev) => [...prev, ...(res.data ?? [])]);
+      } else {
+        setNotifications(res.data ?? []);
+      }
+      return res;
+    } catch {
+      return { data: [], total: 0 };
+    }
+  }, []);
+
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const res = await apiFetch("/notifications/unread-count");
+      setUnreadCount(res.count ?? 0);
+    } catch {}
+  }, []);
+
+  const markNotificationRead = useCallback(async (id) => {
+    try {
+      await apiFetch(`/notifications/${id}/read`, { method: "PATCH" });
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, is_read: 1 } : n)),
+      );
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    } catch {}
+  }, []);
+
+  const markAllNotificationsRead = useCallback(async () => {
+    try {
+      await apiFetch("/notifications/read-all", { method: "PATCH" });
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: 1 })));
+      setUnreadCount(0);
+    } catch {}
+  }, []);
+
+  const deleteNotification = useCallback(async (id) => {
+    try {
+      await apiFetch(`/notifications/${id}`, { method: "DELETE" });
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    } catch {}
+  }, []);
+
+  // SSE connection for real-time notifications
+  useEffect(() => {
+    if (!user) {
+      if (sseRef.current) {
+        sseRef.current.close();
+        sseRef.current = null;
+      }
+      setNotifications([]);
+      setUnreadCount(0);
+      return;
+    }
+    const token = localStorage.getItem("nng_token");
+    if (!token) return;
+
+    fetchUnreadCount();
+
+    // Try SSE connection
+    let es;
+    let pollInterval;
+    try {
+      const sseUrl = `${API_BASE}/notifications/stream?token=${encodeURIComponent(token)}`;
+      es = new EventSource(sseUrl);
+      es.addEventListener("notification", (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          setNotifications((prev) => [data, ...prev].slice(0, 50));
+          setUnreadCount((prev) => prev + 1);
+        } catch {}
+      });
+      es.onerror = () => {
+        // If SSE fails, fallback to polling
+        if (!pollInterval) {
+          pollInterval = setInterval(fetchUnreadCount, 30000);
+        }
+      };
+      sseRef.current = es;
+    } catch {
+      // SSE not available, use polling
+      pollInterval = setInterval(fetchUnreadCount, 30000);
+    }
+
+    return () => {
+      if (es) es.close();
+      if (pollInterval) clearInterval(pollInterval);
+      sseRef.current = null;
+    };
+  }, [user]);
+
+  // ── Web Push Notifications ───────────────────────────────
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const swRef = useRef(null);
+
+  // Check if push is currently active
+  useEffect(() => {
+    if ("serviceWorker" in navigator && "PushManager" in window) {
+      navigator.serviceWorker.getRegistration("/sw.js").then((reg) => {
+        if (reg) {
+          reg.pushManager.getSubscription().then((sub) => {
+            setPushEnabled(!!sub);
+          });
+        }
+      });
+    }
+  }, []);
+
+  const subscribeToPush = useCallback(async () => {
+    try {
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+        addToast("Push notifications are not supported in this browser", "error");
+        return false;
+      }
+
+      // Request notification permission
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        addToast("Notification permission denied", "error");
+        return false;
+      }
+
+      // Register service worker
+      const registration = await navigator.serviceWorker.register("/sw.js");
+      await navigator.serviceWorker.ready;
+      swRef.current = registration;
+
+      // Get VAPID public key from server
+      const { publicKey } = await apiFetch("/notifications/push/vapid-key");
+      if (!publicKey) {
+        addToast("Push not available", "error");
+        return false;
+      }
+
+      // Convert VAPID key to Uint8Array
+      const padding = "=".repeat((4 - (publicKey.length % 4)) % 4);
+      const base64 = (publicKey + padding).replace(/-/g, "+").replace(/_/g, "/");
+      const rawData = window.atob(base64);
+      const applicationServerKey = new Uint8Array(rawData.length);
+      for (let i = 0; i < rawData.length; ++i) {
+        applicationServerKey[i] = rawData.charCodeAt(i);
+      }
+
+      // Subscribe to push
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey,
+      });
+
+      // Send subscription to server
+      await apiFetch("/notifications/push/subscribe", {
+        method: "POST",
+        body: JSON.stringify({ subscription: subscription.toJSON() }),
+      });
+
+      setPushEnabled(true);
+      addToast("Push notifications enabled!");
+      return true;
+    } catch (err) {
+      console.error("Push subscription failed:", err);
+      addToast("Failed to enable push notifications", "error");
+      return false;
+    }
+  }, []);
+
+  const unsubscribeFromPush = useCallback(async () => {
+    try {
+      const registration = await navigator.serviceWorker.getRegistration("/sw.js");
+      if (registration) {
+        const subscription = await registration.pushManager.getSubscription();
+        if (subscription) {
+          await apiFetch("/notifications/push/unsubscribe", {
+            method: "POST",
+            body: JSON.stringify({ endpoint: subscription.endpoint }),
+          });
+          await subscription.unsubscribe();
+        }
+      }
+      setPushEnabled(false);
+      addToast("Push notifications disabled");
+    } catch {
+      addToast("Failed to disable push", "error");
+    }
+  }, []);
+
   return (
     <StoreContext.Provider
       value={{
@@ -688,6 +1050,24 @@ export function StoreProvider({ children }) {
         openWhatsApp,
         addToast,
         api,
+        auctions,
+        auctionsLoading,
+        loadAuctions,
+        loadAdminAuctions,
+        createAuction,
+        updateAuction,
+        deleteAuction,
+        endAuction,
+        placeBid,
+        notifications,
+        unreadCount,
+        fetchNotifications,
+        markNotificationRead,
+        markAllNotificationsRead,
+        deleteNotification,
+        pushEnabled,
+        subscribeToPush,
+        unsubscribeFromPush,
       }}
     >
       {children}
