@@ -130,22 +130,22 @@ export default function NotificationsPage() {
   ]
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: '40px 20px 80px' }}>
+    <div style={{ maxWidth: 720, margin: '0 auto', padding: 'clamp(16px, 4vw, 40px) clamp(12px, 3vw, 20px) 80px' }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 24 }}>
         <div>
           <div className="section-label">Notification Center</div>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 300, margin: 0 }}>Notifications</h1>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.3rem, 5vw, 2rem)', fontWeight: 300, margin: 0 }}>Notifications</h1>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {unreadCount > 0 && (
-            <button className="btn btn-outline" style={{ fontSize: '0.68rem', padding: '8px 14px' }} onClick={markAllNotificationsRead}>
+            <button className="btn btn-outline" style={{ fontSize: '0.65rem', padding: '7px 12px' }} onClick={markAllNotificationsRead}>
               <CheckCheck size={14} /> Mark All Read
             </button>
           )}
           <button
             className={`btn ${showPrefs ? 'btn-gold' : 'btn-outline'}`}
-            style={{ fontSize: '0.68rem', padding: '8px 14px' }}
+            style={{ fontSize: '0.65rem', padding: '7px 12px' }}
             onClick={() => setShowPrefs(v => !v)}
           >
             <Settings size={14} /> Settings

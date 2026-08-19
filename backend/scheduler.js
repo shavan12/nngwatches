@@ -46,6 +46,7 @@ function checkUpcomingAuctions() {
     for (const threshold of UPCOMING_THRESHOLDS) {
       // Send reminder when we're within the threshold window
       // but only if we haven't already (dedup key ensures once-only)
+      // Only fire the FIRST (largest) matching threshold, not all at once
       if (timeUntilStart <= threshold.ms) {
         const image = getAuctionImage(auction)
         notify.createForAllUsers(notify.TYPES.UPCOMING_AUCTION, {
@@ -56,6 +57,7 @@ function checkUpcomingAuctions() {
           actionUrl: `/auction/${auction.id}`,
           dedupKey: `upcoming_${threshold.key}`,
         })
+        break // Only send the closest matching threshold
       }
     }
   }
@@ -119,6 +121,7 @@ function checkEndingSoon() {
           actionUrl: `/auction/${auction.id}`,
           dedupKey: `ending_${threshold.key}`,
         })
+        break // Only send the closest matching threshold
       }
     }
   }

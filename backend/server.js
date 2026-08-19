@@ -532,17 +532,17 @@ app.put('/api/notifications/preferences',auth,(req,res)=>{
   res.json(result)
 })
 
+// Mark all as read (MUST be before :id/read to avoid route conflict)
+app.patch('/api/notifications/read-all',auth,(req,res)=>{
+  const count=notificationService.markAllRead(req.user.id)
+  res.json({message:`Marked ${count} as read`})
+})
+
 // Mark single notification as read
 app.patch('/api/notifications/:id/read',auth,(req,res)=>{
   const ok=notificationService.markRead(Number(req.params.id),req.user.id)
   if(!ok) return res.status(404).json({error:'Not found or not yours'})
   res.json({message:'Marked as read'})
-})
-
-// Mark all as read
-app.patch('/api/notifications/read-all',auth,(req,res)=>{
-  const count=notificationService.markAllRead(req.user.id)
-  res.json({message:`Marked ${count} as read`})
 })
 
 // Delete notification
