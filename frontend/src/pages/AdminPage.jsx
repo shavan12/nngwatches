@@ -109,23 +109,24 @@ function StatCard({ icon:Icon, label, value, color='var(--gold)' }) {
   )
 }
 
-// ── Product modal ─────────────────────────────────────────
-function ProductModal({ product, onClose, onSave, brands, categories, uploadImage }) {
+// ── Product modal ─────────────────────────────────
+function ProductModal({ product, brands, categories, onClose, onSave, uploadImage, t = {}, isMobile = false, dir = 'ltr' }) {
   const isEdit = !!product
-  const [form, setForm] = useState(isEdit ? {
-    name:product.name, brand_id:product.brand_id, category_id:product.category_id,
-    price:product.price, original_price:product.original_price??'',
-    reference:product.reference??'', movement:product.movement??'Automatic',
-    case_material:product.case_material??'', diameter:product.diameter??'',
-    water_resistance:product.water_resistance??'', description:product.description??'',
-    in_stock:product.in_stock, is_new:product.is_new, is_featured:product.is_featured,
-    images:product.images??[],
+  const [form, setForm] = useState(product ? {
+    name: product.name||'', brand_id: product.brand_id||brands[0]?.id||1,
+    category_id: product.category_id||categories[0]?.id||1, price: product.price||'',
+    original_price: product.original_price||'', movement: product.movement||'Automatic',
+    reference: product.reference||'', case_material: product.case_material||'',
+    diameter: product.diameter||'', water_resistance: product.water_resistance||'',
+    description: product.description||'',
+    images: product.images && product.images.length > 0 ? product.images : (product.image_url ? [product.image_url] : ['https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=600&q=80']),
+    in_stock: product.in_stock!==0, is_new: !!product.is_new, is_featured: !!product.is_featured,
   } : {
-    name:'', brand_id:brands[0]?.id??1, category_id:categories[0]?.id??1,
-    price:'', original_price:'', reference:'', movement:'Automatic',
-    case_material:'Stainless Steel', diameter:'', water_resistance:'',
-    description:'', in_stock:true, is_new:false, is_featured:false,
-    images:['https://images.unsplash.com/photo-1547996160-81dfa63595aa?w=600&q=80'],
+    name:'', brand_id: brands[0]?.id||1, category_id: categories[0]?.id||1,
+    price:'', original_price:'', movement:'Automatic', reference:'',
+    case_material:'', diameter:'', water_resistance:'', description:'',
+    images: ['https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=600&q=80'],
+    in_stock:true, is_new:false, is_featured:false,
   })
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -148,26 +149,41 @@ function ProductModal({ product, onClose, onSave, brands, categories, uploadImag
     finally { setSaving(false) }
   }
 
-  const inputStyle = {width:'100%',padding:'11px 14px',background:'var(--bg-elevated)',border:'1px solid var(--border-subtle)',borderRadius:'var(--radius-sm)',color:'var(--text-primary)',fontSize:'16px',outline:'none',fontFamily:'var(--font-body)'}
+  const inputStyle = {
+    width: '100%',
+    maxWidth: '100%',
+    padding: isMobile ? '10px 12px' : '11px 14px',
+    background: 'var(--bg-elevated)',
+    border: '1px solid var(--border-subtle)',
+    borderRadius: 'var(--radius-sm)',
+    color: 'var(--text-primary)',
+    fontSize: '15px',
+    outline: 'none',
+    fontFamily: 'var(--font-body)',
+    boxSizing: 'border-box',
+    minWidth: 0,
+  }
 
   return (
-    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',zIndex:1000,display:'flex',flexDirection:'column',animation:'fadeIn 0.2s ease'}}>
+    <div dir={dir} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',zIndex:1000,display:'flex',flexDirection:'column',animation:'fadeIn 0.2s ease',width:'100vw',maxWidth:'100%',height:'100vh',maxHeight:'100%',boxSizing:'border-box',overflow:'hidden'}}>
       {/* Header */}
-      <div style={{display:'flex',alignItems:'center',gap:12,padding:'16px 20px',background:'var(--bg-secondary)',borderBottom:'1px solid var(--border-subtle)',flexShrink:0}}>
-        <button onClick={onClose} style={{width:36,height:36,borderRadius:'50%',background:'var(--bg-elevated)',border:'1px solid var(--border-subtle)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',color:'var(--text-secondary)'}}>
+      <div style={{display:'flex',alignItems:'center',gap:10,padding:isMobile?'12px 16px':'16px 20px',background:'var(--bg-secondary)',borderBottom:'1px solid var(--border-subtle)',flexShrink:0,width:'100%',boxSizing:'border-box'}}>
+        <button onClick={onClose} style={{width:34,height:34,borderRadius:'50%',background:'var(--bg-elevated)',border:'1px solid var(--border-subtle)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',color:'var(--text-secondary)',flexShrink:0}}>
           <X size={16}/>
         </button>
-        <h2 style={{fontFamily:'var(--font-display)',fontSize:'1.2rem',fontWeight:300,flex:1}}>{isEdit?'Edit Product':'Add Product'}</h2>
-        <button type="button" form="product-form" onClick={handleSubmit} className="btn btn-gold" style={{padding:'9px 20px',fontSize:'0.68rem'}} disabled={saving}>
+        <h2 style={{fontFamily:'var(--font-display)',fontSize:isMobile?'1.05rem':'1.2rem',fontWeight:300,flex:1,margin:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+          {isEdit ? 'Edit Product' : 'Add Product'}
+        </h2>
+        <button type="button" form="product-form" onClick={handleSubmit} className="btn btn-gold" style={{padding:isMobile?'8px 16px':'9px 20px',fontSize:'0.68rem',flexShrink:0}} disabled={saving}>
           {saving ? 'Saving...' : 'Save'}
         </button>
       </div>
 
       {/* Scrollable form */}
-      <form id="product-form" onSubmit={handleSubmit} style={{flex:1,overflowY:'auto',padding:'20px',display:'grid',gap:16}}>
+      <form id="product-form" onSubmit={handleSubmit} style={{flex:1,overflowY:'auto',overflowX:'hidden',padding:isMobile?'16px 14px 40px':'20px',display:'flex',flexDirection:'column',gap:14,width:'100%',maxWidth:600,margin:'0 auto',boxSizing:'border-box'}}>
         {error && (
-          <div style={{padding:'10px 14px',background:'rgba(224,68,68,0.08)',border:'1px solid rgba(224,68,68,0.25)',borderRadius:'var(--radius-sm)',fontSize:'0.78rem',color:'#e04444',display:'flex',gap:8,alignItems:'center'}}>
-            <AlertCircle size={14}/>{error}
+          <div style={{padding:'10px 14px',background:'rgba(224,68,68,0.08)',border:'1px solid rgba(224,68,68,0.25)',borderRadius:'var(--radius-sm)',fontSize:'0.78rem',color:'#e04444',display:'flex',gap:8,alignItems:'center',boxSizing:'border-box'}}>
+            <AlertCircle size={14} style={{flexShrink:0}}/><span>{error}</span>
           </div>
         )}
 
@@ -175,7 +191,7 @@ function ProductModal({ product, onClose, onSave, brands, categories, uploadImag
           <input style={inputStyle} value={form.name} onChange={e=>set('name',e.target.value)} placeholder="Submariner Date" required/>
         </Field>
 
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,width:'100%',boxSizing:'border-box'}}>
           <Field label="Brand *">
             <select style={inputStyle} value={form.brand_id} onChange={e=>set('brand_id',e.target.value)}>
               {brands.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
@@ -188,7 +204,7 @@ function ProductModal({ product, onClose, onSave, brands, categories, uploadImag
           </Field>
         </div>
 
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,width:'100%',boxSizing:'border-box'}}>
           <Field label="Price ($) *">
             <input style={inputStyle} type="number" step="0.01" min="0" value={form.price} onChange={e=>set('price',e.target.value)} placeholder="12500" required/>
           </Field>
@@ -197,7 +213,7 @@ function ProductModal({ product, onClose, onSave, brands, categories, uploadImag
           </Field>
         </div>
 
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,width:'100%',boxSizing:'border-box'}}>
           <Field label="Movement">
             <select style={inputStyle} value={form.movement} onChange={e=>set('movement',e.target.value)}>
               {['Automatic','Manual','Quartz'].map(m=><option key={m}>{m}</option>)}
@@ -208,7 +224,7 @@ function ProductModal({ product, onClose, onSave, brands, categories, uploadImag
           </Field>
         </div>
 
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,width:'100%',boxSizing:'border-box'}}>
           <Field label="Case Material">
             <input style={inputStyle} value={form.case_material} onChange={e=>set('case_material',e.target.value)} placeholder="Stainless Steel"/>
           </Field>
@@ -222,87 +238,86 @@ function ProductModal({ product, onClose, onSave, brands, categories, uploadImag
         </Field>
 
         <Field label="Description">
-          <textarea style={{...inputStyle,resize:'vertical',minHeight:80}} rows={3} value={form.description} onChange={e=>set('description',e.target.value)}/>
+          <textarea style={{...inputStyle,resize:'vertical',minHeight:75}} rows={3} value={form.description} onChange={e=>set('description',e.target.value)}/>
         </Field>
 
         {/* Images */}
-<div>
-  <Label>Images</Label>
+        <div style={{width:'100%',boxSizing:'border-box'}}>
+          <Label>Images</Label>
 
-  {/* Image preview thumbnails */}
-  {form.images.length > 0 && (
-    <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:14}}>
-      {form.images.map((url,i) => (
-        <div key={i} style={{position:'relative',width:72,height:72,borderRadius:'var(--radius-sm)',overflow:'hidden',border:'1px solid var(--border-subtle)'}}>
-          <img src={url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
-          <div style={{position:'absolute',bottom:0,left:0,right:0,padding:'2px 0',background:'rgba(0,0,0,0.7)',color:'white',fontSize:'0.58rem',textAlign:'center',fontWeight:600}}>
-            {i===0 ? 'MAIN' : `#${i+1}`}
+          {/* Image preview thumbnails */}
+          {form.images.length > 0 && (
+            <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:12}}>
+              {form.images.filter(Boolean).map((url,i) => (
+                <div key={i} style={{position:'relative',width:isMobile?58:68,height:isMobile?58:68,borderRadius:'var(--radius-sm)',overflow:'hidden',border:'1px solid var(--border-subtle)',flexShrink:0}}>
+                  <img src={url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                  <div style={{position:'absolute',bottom:0,left:0,right:0,padding:'2px 0',background:'rgba(0,0,0,0.75)',color:'white',fontSize:'0.55rem',textAlign:'center',fontWeight:700}}>
+                    {i===0 ? 'MAIN' : `#${i+1}`}
+                  </div>
+                  <button type="button" onClick={()=>set('images',form.images.filter((_,j)=>j!==i))}
+                    style={{position:'absolute',top:2,right:2,width:18,height:18,borderRadius:'50%',background:'rgba(0,0,0,0.85)',color:'white',display:'flex',alignItems:'center',justifyContent:'center',border:'none',cursor:'pointer'}}>
+                    <X size={10}/>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Individual URL inputs - one per image */}
+          <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:10,width:'100%',boxSizing:'border-box'}}>
+            {form.images.map((url,i) => (
+              <div key={i} style={{display:'flex',gap:6,alignItems:'center',width:'100%',boxSizing:'border-box',minWidth:0}}>
+                <span style={{fontSize:'0.62rem',fontWeight:600,color:'var(--text-muted)',width:isMobile?34:44,flexShrink:0,textAlign:'center'}}>
+                  {i===0 ? 'MAIN' : `#${i+1}`}
+                </span>
+                <input
+                  style={{...inputStyle,flex:1,minWidth:0}}
+                  value={url}
+                  onChange={e=>set('images',form.images.map((u,j)=>j===i?e.target.value:u))}
+                  placeholder="https://..."
+                />
+                <button type="button" onClick={()=>set('images',form.images.filter((_,j)=>j!==i))}
+                  style={{width:34,height:34,borderRadius:'var(--radius-sm)',border:'1px solid rgba(224,68,68,0.3)',background:'rgba(224,68,68,0.05)',color:'#e04444',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                  <X size={14}/>
+                </button>
+              </div>
+            ))}
           </div>
-          <button type="button" onClick={()=>set('images',form.images.filter((_,j)=>j!==i))}
-            style={{position:'absolute',top:3,right:3,width:20,height:20,borderRadius:'50%',background:'rgba(0,0,0,0.8)',color:'white',display:'flex',alignItems:'center',justifyContent:'center',border:'none',cursor:'pointer'}}>
-            <X size={10}/>
-          </button>
+
+          {/* Add buttons row */}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,width:'100%',boxSizing:'border-box'}}>
+            <button type="button" onClick={()=>set('images',[...form.images,''])}
+              style={{padding:'9px',borderRadius:'var(--radius-sm)',border:'1px dashed var(--border)',background:'var(--bg-elevated)',color:'var(--text-secondary)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6,fontSize:isMobile?'0.65rem':'0.72rem',fontWeight:500}}>
+              <Plus size={13}/> Add Image URL
+            </button>
+            <label style={{padding:'9px',borderRadius:'var(--radius-sm)',border:'1px dashed var(--border)',background:'var(--bg-elevated)',color:'var(--text-secondary)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6,fontSize:isMobile?'0.65rem':'0.72rem',fontWeight:500}}>
+              {uploading ? <RefreshCcw size={13} style={{animation:'spin 0.6s linear infinite',color:'var(--gold)'}}/> : <Upload size={13}/>}
+              {uploading ? 'Uploading...' : 'Upload File'}
+              <input type="file" accept="image/*" onChange={handleUpload} style={{display:'none'}}/>
+            </label>
+          </div>
         </div>
-      ))}
-    </div>
-  )}
-
-  {/* Individual URL inputs - one per image */}
-  <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:10}}>
-    {form.images.map((url,i) => (
-      <div key={i} style={{display:'flex',gap:8,alignItems:'center'}}>
-        <span style={{fontSize:'0.65rem',fontWeight:600,color:'var(--text-muted)',width:50,flexShrink:0}}>
-          {i===0 ? 'MAIN' : `IMG ${i+1}`}
-        </span>
-        <input
-          style={{...inputStyle,flex:1}}
-          value={url}
-          onChange={e=>set('images',form.images.map((u,j)=>j===i?e.target.value:u))}
-          placeholder="https://..."
-        />
-        <button type="button" onClick={()=>set('images',form.images.filter((_,j)=>j!==i))}
-          style={{width:36,height:36,borderRadius:'var(--radius-sm)',border:'1px solid rgba(224,68,68,0.3)',background:'rgba(224,68,68,0.05)',color:'#e04444',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-          <X size={14}/>
-        </button>
-      </div>
-    ))}
-  </div>
-
-  {/* Add buttons row */}
-  <div style={{display:'flex',gap:8}}>
-    <button type="button" onClick={()=>set('images',[...form.images,''])}
-      style={{flex:1,padding:'10px',borderRadius:'var(--radius-sm)',border:'1px dashed var(--border)',background:'var(--bg-elevated)',color:'var(--text-secondary)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6,fontSize:'0.72rem',fontWeight:500}}>
-      <Plus size={14}/> Add Image URL
-    </button>
-    <label style={{flex:1,padding:'10px',borderRadius:'var(--radius-sm)',border:'1px dashed var(--border)',background:'var(--bg-elevated)',color:'var(--text-secondary)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6,fontSize:'0.72rem',fontWeight:500}}>
-      {uploading ? <RefreshCcw size={14} style={{animation:'spin 0.6s linear infinite',color:'var(--gold)'}}/> : <Upload size={14}/>}
-      {uploading ? 'Uploading...' : 'Upload File'}
-      <input type="file" accept="image/*" onChange={handleUpload} style={{display:'none'}}/>
-    </label>
-  </div>
-</div>
 
         {/* Toggles */}
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10}}>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,width:'100%',boxSizing:'border-box'}}>
           {[{k:'in_stock',label:'In Stock'},{k:'is_new',label:'New'},{k:'is_featured',label:'Featured'}].map(({k,label})=>(
             <button key={k} type="button" onClick={()=>set(k,!form[k])} style={{
-              padding:'12px 8px', borderRadius:'var(--radius-sm)', cursor:'pointer',
+              padding:'10px 4px', borderRadius:'var(--radius-sm)', cursor:'pointer',
               border:`1px solid ${form[k]?'var(--gold)':'var(--border-subtle)'}`,
               background: form[k] ? 'var(--gold-muted)' : 'var(--bg-elevated)',
               color: form[k] ? 'var(--gold)' : 'var(--text-muted)',
-              fontSize:'0.72rem', fontWeight:500, display:'flex', flexDirection:'column',
-              alignItems:'center', gap:6, transition:'var(--transition)',
+              fontSize:'0.68rem', fontWeight:500, display:'flex', flexDirection:'column',
+              alignItems:'center', gap:5, transition:'var(--transition)',
             }}>
-              <div style={{width:20,height:20,borderRadius:4,border:`1px solid ${form[k]?'var(--gold)':'var(--border-subtle)'}`,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                {form[k] && <Check size={12} style={{color:'var(--gold)'}}/>}
+              <div style={{width:18,height:18,borderRadius:3,border:`1px solid ${form[k]?'var(--gold)':'var(--border-subtle)'}`,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                {form[k] && <Check size={11} style={{color:'var(--gold)'}}/>}
               </div>
-              {label}
+              <span>{label}</span>
             </button>
           ))}
         </div>
 
-        {/* Bottom padding for mobile nav */}
-        <div style={{height:16}}/>
+        <div style={{height:24}}/>
       </form>
     </div>
   )
@@ -444,7 +459,7 @@ function toLocalDatetimeString(dateInput) {
 }
 
 // ── Auction modal ─────────────────────────────────
-function AuctionModal({ initial, isEdit, onClose, onSave, uploadImage, t }) {
+function AuctionModal({ initial, isEdit, onClose, onSave, uploadImage, t = {}, isMobile = false, dir = 'ltr' }) {
   const [form, setForm] = useState(initial)
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -484,56 +499,71 @@ function AuctionModal({ initial, isEdit, onClose, onSave, uploadImage, t }) {
     finally { setSaving(false) }
   }
 
-  const inputStyle = {width:'100%',padding:'11px 14px',background:'var(--bg-elevated)',border:'1px solid var(--border-subtle)',borderRadius:'var(--radius-sm)',color:'var(--text-primary)',fontSize:'16px',outline:'none',fontFamily:'var(--font-body)'}
+  const inputStyle = {
+    width: '100%',
+    maxWidth: '100%',
+    padding: isMobile ? '10px 12px' : '11px 14px',
+    background: 'var(--bg-elevated)',
+    border: '1px solid var(--border-subtle)',
+    borderRadius: 'var(--radius-sm)',
+    color: 'var(--text-primary)',
+    fontSize: '15px',
+    outline: 'none',
+    fontFamily: 'var(--font-body)',
+    boxSizing: 'border-box',
+    minWidth: 0,
+  }
 
   return (
-    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',zIndex:1000,display:'flex',flexDirection:'column',animation:'fadeIn 0.2s ease'}}>
+    <div dir={dir} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',zIndex:1000,display:'flex',flexDirection:'column',animation:'fadeIn 0.2s ease',width:'100vw',maxWidth:'100%',height:'100vh',maxHeight:'100%',boxSizing:'border-box',overflow:'hidden'}}>
       {/* Header */}
-      <div style={{display:'flex',alignItems:'center',gap:12,padding:'16px 20px',background:'var(--bg-secondary)',borderBottom:'1px solid var(--border-subtle)',flexShrink:0}}>
-        <button onClick={onClose} style={{width:36,height:36,borderRadius:'50%',background:'var(--bg-elevated)',border:'1px solid var(--border-subtle)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',color:'var(--text-secondary)'}}>
+      <div style={{display:'flex',alignItems:'center',gap:10,padding:isMobile?'12px 16px':'16px 20px',background:'var(--bg-secondary)',borderBottom:'1px solid var(--border-subtle)',flexShrink:0,width:'100%',boxSizing:'border-box'}}>
+        <button onClick={onClose} style={{width:34,height:34,borderRadius:'50%',background:'var(--bg-elevated)',border:'1px solid var(--border-subtle)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',color:'var(--text-secondary)',flexShrink:0}}>
           <X size={16}/>
         </button>
-        <h2 style={{fontFamily:'var(--font-display)',fontSize:'1.2rem',fontWeight:300,flex:1}}>{isEdit?(t.editAuction||'Edit Auction'):(t.createAuction||'Create Auction')}</h2>
-        <button type="button" onClick={handleSubmit} className="btn btn-gold" style={{padding:'9px 20px',fontSize:'0.68rem'}} disabled={saving}>
-          {saving ? 'Saving...' : (t.save||'Save')}
+        <h2 style={{fontFamily:'var(--font-display)',fontSize:isMobile?'1.05rem':'1.2rem',fontWeight:300,flex:1,margin:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+          {isEdit ? (t.editAuction || 'Edit Auction') : (t.createAuction || 'Create Auction')}
+        </h2>
+        <button type="button" onClick={handleSubmit} className="btn btn-gold" style={{padding:isMobile?'8px 16px':'9px 20px',fontSize:'0.68rem',flexShrink:0}} disabled={saving}>
+          {saving ? (t.loading || 'Saving...') : (t.save || 'Save')}
         </button>
       </div>
 
       {/* Scrollable form */}
-      <form onSubmit={handleSubmit} style={{flex:1,overflowY:'auto',padding:'20px',display:'grid',gap:16}}>
+      <form onSubmit={handleSubmit} style={{flex:1,overflowY:'auto',overflowX:'hidden',padding:isMobile?'16px 14px 40px':'20px',display:'flex',flexDirection:'column',gap:14,width:'100%',maxWidth:600,margin:'0 auto',boxSizing:'border-box'}}>
         {error && (
-          <div style={{padding:'10px 14px',background:'rgba(224,68,68,0.08)',border:'1px solid rgba(224,68,68,0.25)',borderRadius:'var(--radius-sm)',fontSize:'0.78rem',color:'#e04444',display:'flex',gap:8,alignItems:'center'}}>
-            <AlertCircle size={14}/>{error}
+          <div style={{padding:'10px 14px',background:'rgba(224,68,68,0.08)',border:'1px solid rgba(224,68,68,0.25)',borderRadius:'var(--radius-sm)',fontSize:'0.78rem',color:'#e04444',display:'flex',gap:8,alignItems:'center',boxSizing:'border-box'}}>
+            <AlertCircle size={14} style={{flexShrink:0}}/><span>{error}</span>
           </div>
         )}
 
-        <Field label={`${t.auctionName||'Watch Name'} *`}>
+        <Field label={`${t.auctionName || 'Watch Name'} *`}>
           <input style={inputStyle} value={form.name} onChange={e=>set('name',e.target.value)} placeholder="Royal Oak Offshore" required/>
         </Field>
 
-        <Field label={t.auctionBrand||'Brand'}>
+        <Field label={t.auctionBrand || 'Brand'}>
           <input style={inputStyle} value={form.brand} onChange={e=>set('brand',e.target.value)} placeholder="Audemars Piguet"/>
         </Field>
 
-        <Field label={t.auctionDescription||'Description'}>
-          <textarea style={{...inputStyle,resize:'vertical',minHeight:80}} rows={3} value={form.description} onChange={e=>set('description',e.target.value)}/>
+        <Field label={t.auctionDescription || 'Description'}>
+          <textarea style={{...inputStyle, resize:'vertical', minHeight:75}} rows={3} value={form.description} onChange={e=>set('description',e.target.value)}/>
         </Field>
 
         {/* Images */}
-        <div>
-          <Label>{t.auctionImage||'Images'}</Label>
+        <div style={{width:'100%',boxSizing:'border-box'}}>
+          <Label>{t.auctionImage || 'Images'}</Label>
 
           {/* Image preview thumbnails */}
           {form.images.length > 0 && (
-            <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:14}}>
-              {form.images.map((url,i) => (
-                <div key={i} style={{position:'relative',width:72,height:72,borderRadius:'var(--radius-sm)',overflow:'hidden',border:'1px solid var(--border-subtle)'}}>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:12}}>
+              {form.images.filter(Boolean).map((url,i) => (
+                <div key={i} style={{position:'relative',width:isMobile?58:68,height:isMobile?58:68,borderRadius:'var(--radius-sm)',overflow:'hidden',border:'1px solid var(--border-subtle)',flexShrink:0}}>
                   <img src={url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
-                  <div style={{position:'absolute',bottom:0,left:0,right:0,padding:'2px 0',background:'rgba(0,0,0,0.7)',color:'white',fontSize:'0.58rem',textAlign:'center',fontWeight:600}}>
+                  <div style={{position:'absolute',bottom:0,left:0,right:0,padding:'2px 0',background:'rgba(0,0,0,0.75)',color:'white',fontSize:'0.55rem',textAlign:'center',fontWeight:700}}>
                     {i===0 ? 'MAIN' : `#${i+1}`}
                   </div>
                   <button type="button" onClick={()=>set('images',form.images.filter((_,j)=>j!==i))}
-                    style={{position:'absolute',top:3,right:3,width:20,height:20,borderRadius:'50%',background:'rgba(0,0,0,0.8)',color:'white',display:'flex',alignItems:'center',justifyContent:'center',border:'none',cursor:'pointer'}}>
+                    style={{position:'absolute',top:2,right:2,width:18,height:18,borderRadius:'50%',background:'rgba(0,0,0,0.85)',color:'white',display:'flex',alignItems:'center',justifyContent:'center',border:'none',cursor:'pointer'}}>
                     <X size={10}/>
                   </button>
                 </div>
@@ -542,20 +572,20 @@ function AuctionModal({ initial, isEdit, onClose, onSave, uploadImage, t }) {
           )}
 
           {/* Individual URL inputs - one per image */}
-          <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:10}}>
+          <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:10,width:'100%',boxSizing:'border-box'}}>
             {form.images.map((url,i) => (
-              <div key={i} style={{display:'flex',gap:8,alignItems:'center'}}>
-                <span style={{fontSize:'0.65rem',fontWeight:600,color:'var(--text-muted)',width:50,flexShrink:0}}>
-                  {i===0 ? 'MAIN' : `IMG ${i+1}`}
+              <div key={i} style={{display:'flex',gap:6,alignItems:'center',width:'100%',boxSizing:'border-box',minWidth:0}}>
+                <span style={{fontSize:'0.62rem',fontWeight:600,color:'var(--text-muted)',width:isMobile?34:44,flexShrink:0,textAlign:'center'}}>
+                  {i===0 ? 'MAIN' : `#${i+1}`}
                 </span>
                 <input
-                  style={{...inputStyle,flex:1}}
+                  style={{...inputStyle, flex:1, minWidth:0}}
                   value={url}
                   onChange={e=>set('images',form.images.map((u,j)=>j===i?e.target.value:u))}
                   placeholder="https://..."
                 />
                 <button type="button" onClick={()=>set('images',form.images.filter((_,j)=>j!==i))}
-                  style={{width:36,height:36,borderRadius:'var(--radius-sm)',border:'1px solid rgba(224,68,68,0.3)',background:'rgba(224,68,68,0.05)',color:'#e04444',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                  style={{width:34,height:34,borderRadius:'var(--radius-sm)',border:'1px solid rgba(224,68,68,0.3)',background:'rgba(224,68,68,0.05)',color:'#e04444',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
                   <X size={14}/>
                 </button>
               </div>
@@ -563,33 +593,35 @@ function AuctionModal({ initial, isEdit, onClose, onSave, uploadImage, t }) {
           </div>
 
           {/* Add buttons row */}
-          <div style={{display:'flex',gap:8}}>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,width:'100%',boxSizing:'border-box'}}>
             <button type="button" onClick={()=>set('images',[...form.images,''])}
-              style={{flex:1,padding:'10px',borderRadius:'var(--radius-sm)',border:'1px dashed var(--border)',background:'var(--bg-elevated)',color:'var(--text-secondary)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6,fontSize:'0.72rem',fontWeight:500}}>
-              <Plus size={14}/> Add Image URL
+              style={{padding:'9px',borderRadius:'var(--radius-sm)',border:'1px dashed var(--border)',background:'var(--bg-elevated)',color:'var(--text-secondary)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6,fontSize:isMobile?'0.65rem':'0.72rem',fontWeight:500}}>
+              <Plus size={13}/> {t.addImageUrl || 'Add Image URL'}
             </button>
-            <label style={{flex:1,padding:'10px',borderRadius:'var(--radius-sm)',border:'1px dashed var(--border)',background:'var(--bg-elevated)',color:'var(--text-secondary)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6,fontSize:'0.72rem',fontWeight:500}}>
-              {uploading ? <RefreshCcw size={14} style={{animation:'spin 0.6s linear infinite',color:'var(--gold)'}}/> : <Upload size={14}/>}
-              {uploading ? 'Uploading...' : 'Upload File'}
+            <label style={{padding:'9px',borderRadius:'var(--radius-sm)',border:'1px dashed var(--border)',background:'var(--bg-elevated)',color:'var(--text-secondary)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6,fontSize:isMobile?'0.65rem':'0.72rem',fontWeight:500}}>
+              {uploading ? <RefreshCcw size={13} style={{animation:'spin 0.6s linear infinite',color:'var(--gold)'}}/> : <Upload size={13}/>}
+              {uploading ? (t.loading || 'Uploading...') : (t.uploadFile || 'Upload File')}
               <input type="file" accept="image/*" onChange={handleUpload} style={{display:'none'}}/>
             </label>
           </div>
         </div>
 
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-          <Field label={`${t.startingPrice||'Starting Price'} ($) *`}>
+        {/* Pricing row */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,width:'100%',boxSizing:'border-box'}}>
+          <Field label={`${t.startingPrice || 'Starting Price'} ($) *`}>
             <input style={inputStyle} type="number" step="0.01" min="0" value={form.starting_price} onChange={e=>set('starting_price',e.target.value)} placeholder="5000" required/>
           </Field>
-          <Field label={`${t.minIncrement||'Min Increment'} ($)`}>
+          <Field label={`${t.minIncrement || 'Min Increment'} ($)`}>
             <input style={inputStyle} type="number" step="0.01" min="1" value={form.min_increment} onChange={e=>set('min_increment',e.target.value)} placeholder="50"/>
           </Field>
         </div>
 
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-          <Field label={`${t.auctionStartDate||'Start Date'} *`}>
+        {/* Date fields - stacked on mobile, 2 columns on desktop */}
+        <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:12,width:'100%',boxSizing:'border-box'}}>
+          <Field label={`${t.auctionStartDate || 'Start Date'} *`}>
             <input style={inputStyle} type="datetime-local" value={form.start_date} onChange={e=>set('start_date',e.target.value)} required/>
           </Field>
-          <Field label={`${t.auctionEndDate||'End Date'} *`}>
+          <Field label={`${t.auctionEndDate || 'End Date'} *`}>
             <input style={inputStyle} type="datetime-local" value={form.end_date} onChange={e=>set('end_date',e.target.value)} required/>
           </Field>
         </div>
@@ -600,16 +632,17 @@ function AuctionModal({ initial, isEdit, onClose, onSave, uploadImage, t }) {
           border:`1px solid ${form.enabled?'var(--gold)':'var(--border-subtle)'}`,
           background: form.enabled ? 'var(--gold-muted)' : 'var(--bg-elevated)',
           color: form.enabled ? 'var(--gold)' : 'var(--text-muted)',
-          fontSize:'0.72rem', fontWeight:500, display:'flex',
+          fontSize:'0.75rem', fontWeight:500, display:'flex',
           alignItems:'center', gap:10, transition:'var(--transition)',
+          width:'100%', boxSizing:'border-box'
         }}>
-          <div style={{width:20,height:20,borderRadius:4,border:`1px solid ${form.enabled?'var(--gold)':'var(--border-subtle)'}`,display:'flex',alignItems:'center',justifyContent:'center'}}>
+          <div style={{width:20,height:20,borderRadius:4,border:`1px solid ${form.enabled?'var(--gold)':'var(--border-subtle)'}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
             {form.enabled && <Check size={12} style={{color:'var(--gold)'}}/>}
           </div>
-          {t.auctionEnabled||'Enabled'}
+          <span>{t.auctionEnabled || 'Enabled'}</span>
         </button>
 
-        <div style={{height:16}}/>
+        <div style={{height:24}}/>
       </form>
     </div>
   )
@@ -1376,6 +1409,7 @@ export default function AdminPage() {
           product={productModal==='new' ? null : productModal}
           brands={brands} categories={categories} uploadImage={uploadImage}
           onClose={() => setProductModal(null)}
+          isMobile={isMobile} dir={dir} t={t}
           onSave={async (data) => {
             if (productModal==='new') await createProduct(data)
             else await updateProduct(productModal.id, data)
@@ -1421,7 +1455,7 @@ export default function AdminPage() {
           starting_price:'', min_increment:50, start_date:'', end_date:'', enabled:true,
         }
         return <AuctionModal key={isEdit?auctionModal.id:'new'} initial={initial} isEdit={isEdit}
-          uploadImage={uploadImage} t={t}
+          uploadImage={uploadImage} t={t} isMobile={isMobile} dir={dir}
           onClose={()=>setAuctionModal(null)}
           onSave={async (data)=>{
             if(isEdit) await updateAuction(auctionModal.id, data)
