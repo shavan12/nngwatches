@@ -43,10 +43,23 @@ function timeAgo(dateStr, t) {
   return date.toLocaleDateString()
 }
 
+// ── Status calculation ──────────────────────────────────
+function getEffectiveStatus(a, nowTime = Date.now()) {
+  if (!a) return 'ended'
+  if (a.manually_ended) return 'ended'
+  const start = new Date(a.start_date).getTime()
+  const end = new Date(a.end_date).getTime()
+  if (isNaN(start) || isNaN(end)) return a.status || 'ended'
+  if (nowTime < start) return 'upcoming'
+  if (nowTime >= start && nowTime <= end) return 'live'
+  return 'ended'
+}
+
 // ── Countdown calculation ────────────────────────────────
 function getCountdown(targetDate) {
-  const now = new Date().getTime()
+  const now = Date.now()
   const target = new Date(targetDate).getTime()
+  if (isNaN(target)) return { days: 0, hours: 0, minutes: 0, seconds: 0, total: 0 }
   const diff = Math.max(0, target - now)
   return {
     days: Math.floor(diff / (1000 * 60 * 60 * 24)),
@@ -107,15 +120,23 @@ function StatusBadge({ status, t }) {
 }
 
 // ── Countdown Timer Component ────────────────────────────
-function CountdownTimer({ targetDate, label, t }) {
+function CountdownTimer({ targetDate, label, t, onExpire }) {
   const [countdown, setCountdown] = useState(getCountdown(targetDate))
+  const expiredRef = React.useRef(false)
 
   useEffect(() => {
+    expiredRef.current = false
+    setCountdown(getCountdown(targetDate))
     const interval = setInterval(() => {
-      setCountdown(getCountdown(targetDate))
+      const cd = getCountdown(targetDate)
+      setCountdown(cd)
+      if (cd.total <= 0 && !expiredRef.current) {
+        expiredRef.current = true
+        if (onExpire) onExpire()
+      }
     }, 1000)
     return () => clearInterval(interval)
-  }, [targetDate])
+  }, [targetDate, onExpire])
 
   const units = [
     { value: countdown.days, label: t.days || 'Days' },
@@ -191,6 +212,13 @@ export default function AuctionDetailPage() {
   const [bidError, setBidError] = useState('')
   const [placing, setPlacing] = useState(false)
   const [selectedImg, setSelectedImg] = useState(0)
+  const [now, setNow] = useState(Date.now())
+
+  // 1-second live clock ticker
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [])
 
   const fetchAuction = useCallback(() => {
     api(`/auctions/${id}`)
@@ -206,14 +234,25 @@ export default function AuctionDetailPage() {
       .finally(() => setLoading(false))
   }, [id, api])
 
-  // Initial fetch + 5s live refresh
+  // Initial fetch + 3s live refresh
   useEffect(() => {
     setLoading(true); setError(''); setBidError('')
     fetchAuction()
-    const interval = setInterval(fetchAuction, 5000)
+    const interval = setInterval(fetchAuction, 3000)
     window.scrollTo(0, 0)
     return () => clearInterval(interval)
   }, [id, fetchAuction])
+
+  const effectiveStatus = getEffectiveStatus(auction, now)
+  const prevStatusRef = React.useRef(effectiveStatus)
+
+  // When dynamic status transitions (e.g. upcoming -> live), re-fetch immediately
+  useEffect(() => {
+    if (prevStatusRef.current !== effectiveStatus) {
+      prevStatusRef.current = effectiveStatus
+      fetchAuction()
+    }
+  }, [effectiveStatus, fetchAuction])
 
   const handleBid = async () => {
     if (!user) { setAuthOpen(true); return }
@@ -284,7 +323,7 @@ export default function AuctionDetailPage() {
         />
         {/* Status badge — top left */}
         <div style={{ position: 'absolute', top: mobile ? 12 : 16, left: mobile ? 12 : 16 }}>
-          <StatusBadge status={auction.status} t={t} />
+          <StatusBadge status={effectiveStatus} t={t} />
         </div>
         {/* Brand tag — top right */}
         <div style={{
@@ -433,21 +472,23 @@ export default function AuctionDetailPage() {
 
       {/* ── Countdown Timer ── */}
       <div style={{ marginBottom: 24, animation: 'fadeInUp 0.5s ease forwards', animationDelay: '0.3s', opacity: 0 }}>
-        {auction.status === 'live' && (
+        {effectiveStatus === 'live' && (
           <CountdownTimer
             targetDate={auction.end_date}
             label={t.timeRemaining || 'Time Remaining'}
             t={t}
+            onExpire={fetchAuction}
           />
         )}
-        {auction.status === 'upcoming' && (
+        {effectiveStatus === 'upcoming' && (
           <CountdownTimer
             targetDate={auction.start_date}
             label={t.auctionStartsIn || 'Auction Starts In'}
             t={t}
+            onExpire={fetchAuction}
           />
         )}
-        {auction.status === 'ended' && (
+        {effectiveStatus === 'ended' && (
           <div style={{
             display: 'flex', alignItems: 'center', gap: 10,
             padding: '14px 18px',
@@ -464,7 +505,7 @@ export default function AuctionDetailPage() {
 
       {/* ── Bid Form / Status ── */}
       <div style={{ marginBottom: 28, animation: 'fadeInUp 0.5s ease forwards', animationDelay: '0.4s', opacity: 0 }}>
-        {auction.status === 'live' && (
+        {effectiveStatus === 'live' && (
           <>
             {!user ? (
               /* Not logged in */
@@ -579,7 +620,7 @@ export default function AuctionDetailPage() {
           </>
         )}
 
-        {auction.status === 'upcoming' && (
+        {effectiveStatus === 'upcoming' && (
           <div style={{
             padding: '20px',
             background: 'rgba(100,149,237,0.05)',
@@ -594,7 +635,7 @@ export default function AuctionDetailPage() {
           </div>
         )}
 
-        {auction.status === 'ended' && auction.winner && (
+        {effectiveStatus === 'ended' && auction.winner && (
           <div style={{
             padding: '24px',
             background: 'linear-gradient(135deg, rgba(201,168,76,0.06), rgba(201,168,76,0.02))',
@@ -861,7 +902,7 @@ export default function AuctionDetailPage() {
               {auction.name}
             </div>
           </div>
-          <StatusBadge status={auction.status} t={t} />
+          <StatusBadge status={effectiveStatus} t={t} />
         </div>
 
         {/* Image */}

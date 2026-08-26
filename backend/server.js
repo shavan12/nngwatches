@@ -298,10 +298,14 @@ app.delete('/api/slides/:id',admin,(req,res)=>{
 
 // ════════ AUCTION HELPERS ════════
 function resolveAuctionStatus(a) {
-  if(a.manually_ended) return 'ended'
-  const now=new Date(), start=new Date(a.start_date), end=new Date(a.end_date)
-  if(now<start) return 'upcoming'
-  if(now>=start&&now<=end) return 'live'
+  if (!a) return 'ended'
+  if (a.manually_ended) return 'ended'
+  const now = Date.now()
+  const start = new Date(a.start_date).getTime()
+  const end = new Date(a.end_date).getTime()
+  if (isNaN(start) || isNaN(end)) return 'ended'
+  if (now < start) return 'upcoming'
+  if (now >= start && now <= end) return 'live'
   return 'ended'
 }
 
@@ -337,7 +341,11 @@ app.get('/api/auctions',(req,res)=>{
   if(req.query.status) list=list.filter(a=>a.status===req.query.status)
   list.sort((a,b)=>{
     const order={live:0,upcoming:1,ended:2}
-    return (order[a.status]??9)-(order[b.status]??9)||new Date(a.end_date)-new Date(b.end_date)
+    const diff = (order[a.status]??9)-(order[b.status]??9)
+    if (diff !== 0) return diff
+    const endA = new Date(a.end_date).getTime() || 0
+    const endB = new Date(b.end_date).getTime() || 0
+    return endA - endB
   })
   res.json({data:list,total:list.length})
 })
@@ -422,8 +430,13 @@ app.get('/api/auctions/admin/all',admin,(req,res)=>{
 app.post('/api/auctions',admin,(req,res)=>{
   const{name,brand='',description='',image_url='',starting_price,min_increment=50,start_date,end_date,enabled=1,images=[]}=req.body
   if(!name||!starting_price||!start_date||!end_date) return res.status(400).json({error:'name, starting_price, start_date, end_date required'})
-  if(new Date(end_date)<=new Date(start_date)) return res.status(400).json({error:'End date must be after start date'})
-  const auction=db.insert('auctions',{name,brand,description,image_url:image_url||images[0]||'',starting_price:Number(starting_price),min_increment:Number(min_increment),start_date,end_date,enabled:enabled?1:0,manually_ended:0})
+  const startTime = new Date(start_date).getTime()
+  const endTime = new Date(end_date).getTime()
+  if(isNaN(startTime)||isNaN(endTime)) return res.status(400).json({error:'Invalid start_date or end_date'})
+  if(endTime<=startTime) return res.status(400).json({error:'End date must be after start date'})
+  const start_iso = new Date(startTime).toISOString()
+  const end_iso = new Date(endTime).toISOString()
+  const auction=db.insert('auctions',{name,brand,description,image_url:image_url||images[0]||'',starting_price:Number(starting_price),min_increment:Number(min_increment),start_date:start_iso,end_date:end_iso,enabled:enabled?1:0,manually_ended:0})
   if(images.length>0) images.forEach((url,i)=>db.insert('auction_images',{auction_id:auction.id,url,sort_order:i}))
   else if(image_url) db.insert('auction_images',{auction_id:auction.id,url:image_url,sort_order:0})
   const result = fullAuction(auction)
@@ -453,6 +466,10 @@ app.put('/api/auctions/:id',admin,(req,res)=>{
     if(req.body[f]!==undefined){
       if(f==='enabled') updates[f]=req.body[f]?1:0
       else if(['starting_price','min_increment'].includes(f)) updates[f]=Number(req.body[f])
+      else if(['start_date','end_date'].includes(f)) {
+        const t = new Date(req.body[f]).getTime()
+        if (!isNaN(t)) updates[f] = new Date(t).toISOString()
+      }
       else updates[f]=req.body[f]
     }
   })
@@ -765,7 +782,7 @@ if(db.count('users')===0){
 // Seed sample auctions if none exist
 if(db.count('auctions')===0){
   const now=new Date()
-  const d=(days)=>new Date(now.getTime()+days*86400000).toISOString().replace('T',' ').split('.')[0]
+  const d=(days)=>new Date(now.getTime()+days*86400000).toISOString()
   db.insert('auctions',{name:'Royal Oak Offshore',brand:'Audemars Piguet',description:'The iconic Royal Oak Offshore, a masterpiece of haute horlogerie. This 42mm timepiece features a stainless steel case with a ceramic bezel, automatic movement, and the signature octagonal shape.',image_url:'https://images.unsplash.com/photo-1587836374828-4dbafa94cf0e?w=600&q=80',starting_price:15000,min_increment:500,start_date:d(-2),end_date:d(5),enabled:1,manually_ended:0})
   db.insert('auction_images',{auction_id:1,url:'https://images.unsplash.com/photo-1587836374828-4dbafa94cf0e?w=600&q=80',sort_order:0})
   db.insert('auction_images',{auction_id:1,url:'https://images.unsplash.com/photo-1612817159949-195b6eb9e31a?w=600&q=80',sort_order:1})

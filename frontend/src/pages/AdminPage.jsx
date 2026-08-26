@@ -348,6 +348,14 @@ function OrderCard({ order, onStatusChange }) {
   )
 }
 
+function toLocalDatetimeString(dateInput) {
+  if (!dateInput) return ''
+  const d = new Date(dateInput)
+  if (isNaN(d.getTime())) return ''
+  const pad = n => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 // ── Auction modal ─────────────────────────────────
 function AuctionModal({ initial, isEdit, onClose, onSave, uploadImage, t }) {
   const [form, setForm] = useState(initial)
@@ -367,10 +375,23 @@ function AuctionModal({ initial, isEdit, onClose, onSave, uploadImage, t }) {
   const handleSubmit = async (e) => {
     e?.preventDefault(); setSaving(true); setError('')
     try {
+      if (!form.start_date || !form.end_date) {
+        throw new Error('Start date and End date are required')
+      }
+      const startMs = new Date(form.start_date).getTime()
+      const endMs = new Date(form.end_date).getTime()
+      if (isNaN(startMs) || isNaN(endMs)) {
+        throw new Error('Please select valid start and end dates')
+      }
+      if (endMs <= startMs) {
+        throw new Error(t.endDateAfterStart || 'End date must be after start date')
+      }
       await onSave({
         ...form,
         starting_price: parseFloat(form.starting_price),
         min_increment: parseFloat(form.min_increment),
+        start_date: new Date(startMs).toISOString(),
+        end_date: new Date(endMs).toISOString(),
       })
     } catch (err) { setError(err.message) }
     finally { setSaving(false) }
@@ -1229,8 +1250,10 @@ export default function AdminPage() {
         const initial = isEdit ? {
           name: auctionModal.name||'', brand: auctionModal.brand||'', description: auctionModal.description||'',
           images: auctionModal.images||[], starting_price: auctionModal.starting_price||'',
-          min_increment: auctionModal.min_increment||50, start_date: auctionModal.start_date?.slice(0,16)||'',
-          end_date: auctionModal.end_date?.slice(0,16)||'', enabled: auctionModal.enabled!==0,
+          min_increment: auctionModal.min_increment||50,
+          start_date: toLocalDatetimeString(auctionModal.start_date),
+          end_date: toLocalDatetimeString(auctionModal.end_date),
+          enabled: auctionModal.enabled!==0,
         } : {
           name:'', brand:'', description:'', images:['https://images.unsplash.com/photo-1547996160-81dfa63595aa?w=600&q=80'],
           starting_price:'', min_increment:50, start_date:'', end_date:'', enabled:true,

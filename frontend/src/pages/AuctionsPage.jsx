@@ -3,9 +3,23 @@ import { useNavigate } from 'react-router-dom'
 import { Timer, Users, Gavel, TrendingUp, Clock, Radio } from 'lucide-react'
 import { useStore } from '../context/StoreContext'
 
+/* ── Status calculation ────────────────────────────────── */
+function getEffectiveStatus(a, nowTime = Date.now()) {
+  if (!a) return 'ended'
+  if (a.manually_ended) return 'ended'
+  const start = new Date(a.start_date).getTime()
+  const end = new Date(a.end_date).getTime()
+  if (isNaN(start) || isNaN(end)) return a.status || 'ended'
+  if (nowTime < start) return 'upcoming'
+  if (nowTime >= start && nowTime <= end) return 'live'
+  return 'ended'
+}
+
 /* ── Countdown helpers ──────────────────────────── */
-function getTimeLeft(target) {
-  const diff = new Date(target) - new Date()
+function getTimeLeft(target, nowTime = Date.now()) {
+  const targetMs = new Date(target).getTime()
+  if (isNaN(targetMs)) return { expired: true, days: 0, hours: 0, minutes: 0, seconds: 0 }
+  const diff = targetMs - nowTime
   if (diff <= 0) return { expired: true, days: 0, hours: 0, minutes: 0, seconds: 0 }
   return {
     expired: false,
@@ -16,18 +30,32 @@ function getTimeLeft(target) {
   }
 }
 
-function useCountdown(targetDate) {
+function useCountdown(targetDate, onExpire) {
   const [timeLeft, setTimeLeft] = useState(getTimeLeft(targetDate))
+  const expiredRef = React.useRef(false)
+
   useEffect(() => {
-    const timer = setInterval(() => setTimeLeft(getTimeLeft(targetDate)), 1000)
+    expiredRef.current = false
+    const initial = getTimeLeft(targetDate)
+    setTimeLeft(initial)
+    if (initial.expired && onExpire) onExpire()
+
+    const timer = setInterval(() => {
+      const current = getTimeLeft(targetDate)
+      setTimeLeft(current)
+      if (current.expired && !expiredRef.current) {
+        expiredRef.current = true
+        if (onExpire) onExpire()
+      }
+    }, 1000)
     return () => clearInterval(timer)
-  }, [targetDate])
+  }, [targetDate, onExpire])
   return timeLeft
 }
 
 /* ── Compact countdown display ──────────────────── */
-function CountdownCompact({ targetDate, label, t }) {
-  const { expired, days, hours, minutes, seconds } = useCountdown(targetDate)
+function CountdownCompact({ targetDate, label, t, onExpire }) {
+  const { expired, days, hours, minutes, seconds } = useCountdown(targetDate, onExpire)
   if (expired) return null
 
   const parts = []
@@ -109,11 +137,12 @@ function StatusBadge({ status, t }) {
 }
 
 /* ── Auction card ───────────────────────────────── */
-function AuctionCard({ auction, index, t, dir }) {
+function AuctionCard({ auction, index, t, dir, now, onExpire }) {
   const navigate = useNavigate()
-  const isLive = auction.status === 'live'
-  const isUpcoming = auction.status === 'upcoming'
-  const isEnded = auction.status === 'ended'
+  const effectiveStatus = getEffectiveStatus(auction, now)
+  const isLive = effectiveStatus === 'live'
+  const isUpcoming = effectiveStatus === 'upcoming'
+  const isEnded = effectiveStatus === 'ended'
   const price = isLive
     ? (auction.current_highest_bid || auction.starting_price)
     : auction.starting_price
@@ -145,7 +174,7 @@ function AuctionCard({ auction, index, t, dir }) {
             top: 8,
             [dir === 'rtl' ? 'right' : 'left']: 8,
           }}>
-            <StatusBadge status={auction.status} t={t} />
+            <StatusBadge status={effectiveStatus} t={t} />
           </div>
           {/* Gradient overlay for ended auctions */}
           {isEnded && (
@@ -199,6 +228,7 @@ function AuctionCard({ auction, index, t, dir }) {
                 targetDate={countdownTarget}
                 label={countdownLabel}
                 t={t}
+                onExpire={onExpire}
               />
             </div>
           )}
@@ -250,6 +280,13 @@ export default function AuctionsPage() {
   const [auctions, setAuctions] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('all')
+  const [now, setNow] = useState(Date.now())
+
+  // 1-second live clock ticker
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [])
 
   const tabs = useMemo(() => [
     { key: 'all',      label: t.all || 'All' },
@@ -258,16 +295,27 @@ export default function AuctionsPage() {
     { key: 'ended',    label: t.auctionEnded || 'Ended' },
   ], [t])
 
-  useEffect(() => {
-    setLoading(true)
+  const loadAuctions = useCallback((showLoading = false) => {
+    if (showLoading) setLoading(true)
     const endpoint = activeTab === 'all'
       ? '/auctions'
       : `/auctions?status=${activeTab}`
     api(endpoint)
       .then(res => setAuctions(res.data || []))
       .catch(() => setAuctions([]))
-      .finally(() => setLoading(false))
-  }, [activeTab])
+      .finally(() => { if (showLoading) setLoading(false) })
+  }, [activeTab, api])
+
+  // Initial fetch on tab change
+  useEffect(() => {
+    loadAuctions(true)
+  }, [loadAuctions])
+
+  // 5-second polling interval
+  useEffect(() => {
+    const interval = setInterval(() => loadAuctions(false), 5000)
+    return () => clearInterval(interval)
+  }, [loadAuctions])
 
   return (
     <div dir={dir} style={{ padding: '32px 0 80px' }}>
@@ -404,6 +452,8 @@ export default function AuctionsPage() {
                 index={i}
                 t={t}
                 dir={dir}
+                now={now}
+                onExpire={() => loadAuctions(false)}
               />
             ))}
           </div>

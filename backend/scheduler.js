@@ -16,10 +16,12 @@ const ENDING_THRESHOLDS = [
 ]
 
 function resolveStatus(auction) {
+  if (!auction) return 'ended'
   if (auction.manually_ended) return 'ended'
-  const now = new Date()
-  const start = new Date(auction.start_date)
-  const end = new Date(auction.end_date)
+  const now = Date.now()
+  const start = new Date(auction.start_date).getTime()
+  const end = new Date(auction.end_date).getTime()
+  if (isNaN(start) || isNaN(end)) return 'ended'
   if (now < start) return 'upcoming'
   if (now >= start && now <= end) return 'live'
   return 'ended'
@@ -40,6 +42,7 @@ function checkUpcomingAuctions() {
     if (status !== 'upcoming') continue
 
     const startTime = new Date(auction.start_date).getTime()
+    if (isNaN(startTime)) continue
     const timeUntilStart = startTime - now
     if (timeUntilStart <= 0) continue
 
@@ -67,12 +70,12 @@ function checkUpcomingAuctions() {
 
 function checkAuctionStarts() {
   const auctions = db.all('auctions').filter(a => a.enabled !== 0 && !a.manually_ended)
-  const now = new Date()
+  const now = Date.now()
 
   for (const auction of auctions) {
-    const start = new Date(auction.start_date)
-    const end = new Date(auction.end_date)
-    if (now >= start && now <= end) {
+    const start = new Date(auction.start_date).getTime()
+    const end = new Date(auction.end_date).getTime()
+    if (!isNaN(start) && !isNaN(end) && now >= start && now <= end) {
       // Auction is live — send started notification
       const image = getAuctionImage(auction)
       notify.createForAllUsers(notify.TYPES.AUCTION_STARTED, {
@@ -237,11 +240,11 @@ function start(_db, _notify, _sse) {
   sse = _sse
   
   // Run immediately on start
-  setTimeout(processAll, 3000) // 3s delay to let everything initialize
+  setTimeout(processAll, 2000) // 2s delay to let everything initialize
   
-  // Then every 60 seconds
-  intervalId = setInterval(processAll, 60 * 1000)
-  console.log('⏰ Auction scheduler started (60s interval)')
+  // Then every 10 seconds
+  intervalId = setInterval(processAll, 10 * 1000)
+  console.log('⏰ Auction scheduler started (10s interval)')
 }
 
 function stop() {
