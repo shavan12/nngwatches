@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Timer, Users, Gavel, TrendingUp, Clock, Radio } from 'lucide-react'
 import { useStore } from '../context/StoreContext'
@@ -32,7 +32,7 @@ function getTimeLeft(target, nowTime = Date.now()) {
 
 function useCountdown(targetDate, onExpire) {
   const [timeLeft, setTimeLeft] = useState(getTimeLeft(targetDate))
-  const expiredRef = React.useRef(false)
+  const expiredRef = useRef(false)
 
   useEffect(() => {
     expiredRef.current = false

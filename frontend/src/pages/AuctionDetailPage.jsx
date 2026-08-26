@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Timer, Users, Gavel, Trophy, TrendingUp, Clock, AlertCircle, Loader, ShoppingCart } from 'lucide-react'
 import { useStore } from '../context/StoreContext'
@@ -122,7 +122,7 @@ function StatusBadge({ status, t }) {
 // ── Countdown Timer Component ────────────────────────────
 function CountdownTimer({ targetDate, label, t, onExpire }) {
   const [countdown, setCountdown] = useState(getCountdown(targetDate))
-  const expiredRef = React.useRef(false)
+  const expiredRef = useRef(false)
 
   useEffect(() => {
     expiredRef.current = false
@@ -244,7 +244,7 @@ export default function AuctionDetailPage() {
   }, [id, fetchAuction])
 
   const effectiveStatus = getEffectiveStatus(auction, now)
-  const prevStatusRef = React.useRef(effectiveStatus)
+  const prevStatusRef = useRef(effectiveStatus)
 
   // When dynamic status transitions (e.g. upcoming -> live), re-fetch immediately
   useEffect(() => {
