@@ -749,10 +749,10 @@ export function StoreProvider({ children }) {
     }
   }, []);
 
-  const register = useCallback(async (name, email, password, phone = "") => {
+  const register = useCallback(async (name, email, password, phone = "", confirm_password = "", location = "") => {
     const res = await apiFetch("/auth/register", {
       method: "POST",
-      body: JSON.stringify({ name, email, password, phone }),
+      body: JSON.stringify({ name, email, password, phone, confirm_password, location }),
     });
     localStorage.setItem("nng_token", res.token);
     localStorage.setItem("nng_user", JSON.stringify(res.user));
