@@ -33,29 +33,39 @@ function StatusBadge({ status }) {
 
 // ── Bottom nav for mobile ─────────────────────────────────
 function BottomNav({ items, active, onChange }) {
+  const ref = React.useRef(null)
+  // Auto-scroll to active item
+  React.useEffect(() => {
+    if (!ref.current) return
+    const el = ref.current.querySelector('[data-active="true"]')
+    if (el) el.scrollIntoView({ inline: 'center', behavior: 'smooth', block: 'nearest' })
+  }, [active])
   return (
-    <div style={{
+    <div ref={ref} style={{
       position:'fixed',bottom:0,left:0,right:0,
       background:'var(--bg-secondary)',
       borderTop:'1px solid var(--border-subtle)',
       display:'flex',zIndex:700,
+      overflowX:'auto', WebkitOverflowScrolling:'touch',
+      scrollbarWidth:'none',
       paddingBottom:'env(safe-area-inset-bottom)',
     }}>
+      <style>{`.admin-bnav::-webkit-scrollbar{display:none}`}</style>
       {items.map(item => (
-        <button key={item.id} onClick={() => onChange(item.id)} style={{
-          flex:1, display:'flex', flexDirection:'column', alignItems:'center',
-          justifyContent:'center', padding:'10px 4px 8px',
+        <button key={item.id} data-active={active===item.id} onClick={() => onChange(item.id)} style={{
+          minWidth:64, flexShrink:0, display:'flex', flexDirection:'column', alignItems:'center',
+          justifyContent:'center', padding:'8px 6px 6px',
           color: active===item.id ? 'var(--gold)' : 'var(--text-muted)',
           background:'transparent', border:'none', cursor:'pointer',
-          fontSize:'0.55rem', fontWeight:600, letterSpacing:'0.05em',
-          textTransform:'uppercase', gap:4,
+          fontSize:'0.48rem', fontWeight:600, letterSpacing:'0.04em',
+          textTransform:'uppercase', gap:3,
           borderTop: active===item.id ? '2px solid var(--gold)' : '2px solid transparent',
-          transition:'all 0.2s',
+          transition:'all 0.2s', position:'relative',
         }}>
-          <item.icon size={18}/>
-          <span>{item.label}</span>
+          <item.icon size={16}/>
+          <span style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:56}}>{item.label}</span>
           {item.badge > 0 && (
-            <span style={{position:'absolute',top:6,background:'var(--gold)',color:'var(--bg-primary)',borderRadius:10,padding:'1px 5px',fontSize:'0.5rem',fontWeight:700}}>
+            <span style={{position:'absolute',top:4,right:8,background:'var(--gold)',color:'var(--bg-primary)',borderRadius:10,padding:'1px 4px',fontSize:'0.45rem',fontWeight:700}}>
               {item.badge}
             </span>
           )}
@@ -965,13 +975,13 @@ export default function AdminPage() {
         )}
         {section==='customers' && (
           <div>
-            <div style={{display:'flex',flexWrap:'wrap',justifyContent:'space-between',alignItems:'center',gap:12,marginBottom:24}}>
-              <h2 style={{fontFamily:'var(--font-display)',fontSize:'1.3rem',fontWeight:300,margin:0}}>{t.customerManagement||'Customer Management'}</h2>
-              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                <div style={{position:'relative'}}>
+            <div style={{display:'flex',flexWrap:'wrap',justifyContent:'space-between',alignItems:'center',gap:12,marginBottom:20}}>
+              <h2 style={{fontFamily:'var(--font-display)',fontSize:isMobile?'1.1rem':'1.3rem',fontWeight:300,margin:0}}>{t.customerManagement||'Customer Management'}</h2>
+              <div style={{display:'flex',gap:8,flexWrap:'wrap',width:isMobile?'100%':'auto'}}>
+                <div style={{position:'relative',flex:isMobile?1:'unset'}}>
                   <Search size={14} style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'var(--text-muted)'}}/>
                   <input type="text" placeholder={t.searchCustomers||'Search customers...'} value={customerSearch} onChange={e=>setCustomerSearch(e.target.value)}
-                    style={{paddingLeft:32,padding:'8px 12px 8px 32px',background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:'var(--radius)',color:'var(--text-primary)',fontSize:'0.75rem',minWidth:200}}/>
+                    style={{paddingLeft:32,padding:'8px 12px 8px 32px',background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:'var(--radius)',color:'var(--text-primary)',fontSize:'0.75rem',width:'100%',minWidth:isMobile?0:200}}/>
                 </div>
                 <select value={customerFilter} onChange={e=>setCustomerFilter(e.target.value)}
                   style={{padding:'8px 12px',background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:'var(--radius)',color:'var(--text-primary)',fontSize:'0.75rem'}}>
@@ -983,129 +993,185 @@ export default function AdminPage() {
               </div>
             </div>
             {customersLoading ? <div style={{textAlign:'center',padding:40,color:'var(--text-muted)'}}>{t.loading||'Loading...'}</div> : (
-              <div style={{overflowX:'auto'}}>
-                <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.75rem'}}>
-                  <thead>
-                    <tr style={{borderBottom:'2px solid var(--border)'}}>
-                      {[t.customerId||'ID',t.customerName||'Name',t.customerEmail||'Email',t.customerPhone||'Phone',t.customerLocation||'Location',t.registrationDate||'Registered',t.totalBids||'Bids',t.totalAuctionsParticipated||'Auctions',t.totalWins||'Wins',t.customerStatus||'Status'].map((h,i)=>(
-                        <th key={i} style={{padding:'10px 8px',textAlign:dir==='rtl'?'right':'left',fontWeight:600,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.08em',fontSize:'0.6rem',whiteSpace:'nowrap'}}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
+              <>
+                {/* Desktop table */}
+                {!isMobile && (
+                  <div style={{overflowX:'auto'}}>
+                    <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.75rem'}}>
+                      <thead>
+                        <tr style={{borderBottom:'2px solid var(--border)'}}>
+                          {[t.customerId||'ID',t.customerName||'Name',t.customerEmail||'Email',t.customerPhone||'Phone',t.customerLocation||'Location',t.registrationDate||'Registered',t.totalBids||'Bids',t.totalAuctionsParticipated||'Auctions',t.totalWins||'Wins',t.customerStatus||'Status'].map((h,i)=>(
+                            <th key={i} style={{padding:'10px 8px',textAlign:dir==='rtl'?'right':'left',fontWeight:600,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.08em',fontSize:'0.6rem',whiteSpace:'nowrap'}}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {customers
+                          .filter(c=>c.role!=='admin')
+                          .filter(c=>customerFilter==='all'||(c.status||'active')===customerFilter)
+                          .filter(c=>!customerSearch||c.name?.toLowerCase().includes(customerSearch.toLowerCase())||c.email?.toLowerCase().includes(customerSearch.toLowerCase())||c.phone?.includes(customerSearch))
+                          .map(c=>(
+                          <tr key={c.id} style={{borderBottom:'1px solid var(--border-subtle)',transition:'background 0.15s'}} onMouseEnter={e=>e.currentTarget.style.background='var(--bg-secondary)'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                            <td style={{padding:'12px 8px',color:'var(--text-muted)'}}>{c.id}</td>
+                            <td style={{padding:'12px 8px',fontWeight:500,color:'var(--text-primary)'}}>{c.name}</td>
+                            <td style={{padding:'12px 8px',color:'var(--text-secondary)'}}>{c.email}</td>
+                            <td style={{padding:'12px 8px',color:'var(--text-secondary)'}}>{c.phone||'—'}</td>
+                            <td style={{padding:'12px 8px',color:'var(--text-secondary)',maxWidth:150,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.location||'—'}</td>
+                            <td style={{padding:'12px 8px',color:'var(--text-muted)',whiteSpace:'nowrap'}}>{c.created_at?new Date(c.created_at).toLocaleDateString():'—'}</td>
+                            <td style={{padding:'12px 8px',textAlign:'center'}}>{c.bidCount}</td>
+                            <td style={{padding:'12px 8px',textAlign:'center'}}>{c.auctionCount}</td>
+                            <td style={{padding:'12px 8px',textAlign:'center'}}>{c.wonCount}</td>
+                            <td style={{padding:'12px 8px'}}>
+                              <select value={c.status||'active'} onChange={e=>updateCustomerStatus(c.id,e.target.value)}
+                                style={{padding:'4px 8px',background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:'var(--radius)',color:c.status==='banned'?'#e04444':c.status==='suspended'?'#f59e0b':'#4cc9a8',fontSize:'0.65rem',fontWeight:600}}>
+                                <option value="active">{t.active||'Active'}</option>
+                                <option value="suspended">{t.suspended||'Suspended'}</option>
+                                <option value="banned">{t.banned||'Banned'}</option>
+                              </select>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                {/* Mobile cards */}
+                {isMobile && (
+                  <div style={{display:'flex',flexDirection:'column',gap:10}}>
                     {customers
                       .filter(c=>c.role!=='admin')
-                      .filter(c=>customerFilter==='all'||c.status===customerFilter)
+                      .filter(c=>customerFilter==='all'||(c.status||'active')===customerFilter)
                       .filter(c=>!customerSearch||c.name?.toLowerCase().includes(customerSearch.toLowerCase())||c.email?.toLowerCase().includes(customerSearch.toLowerCase())||c.phone?.includes(customerSearch))
                       .map(c=>(
-                      <tr key={c.id} style={{borderBottom:'1px solid var(--border-subtle)',transition:'background 0.15s'}} onMouseEnter={e=>e.currentTarget.style.background='var(--bg-secondary)'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                        <td style={{padding:'12px 8px',color:'var(--text-muted)'}}>{c.id}</td>
-                        <td style={{padding:'12px 8px',fontWeight:500,color:'var(--text-primary)'}}>{c.name}</td>
-                        <td style={{padding:'12px 8px',color:'var(--text-secondary)'}}>{c.email}</td>
-                        <td style={{padding:'12px 8px',color:'var(--text-secondary)'}}>{c.phone||'—'}</td>
-                        <td style={{padding:'12px 8px',color:'var(--text-secondary)',maxWidth:150,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.location||'—'}</td>
-                        <td style={{padding:'12px 8px',color:'var(--text-muted)',whiteSpace:'nowrap'}}>{c.created_at?new Date(c.created_at).toLocaleDateString():'—'}</td>
-                        <td style={{padding:'12px 8px',textAlign:'center'}}>{c.bidCount}</td>
-                        <td style={{padding:'12px 8px',textAlign:'center'}}>{c.auctionCount}</td>
-                        <td style={{padding:'12px 8px',textAlign:'center'}}>{c.wonCount}</td>
-                        <td style={{padding:'12px 8px'}}>
+                      <div key={c.id} style={{background:'var(--bg-card)',border:'1px solid var(--border-subtle)',borderRadius:'var(--radius-lg,12px)',padding:14}}>
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontWeight:600,color:'var(--text-primary)',fontSize:'0.85rem',marginBottom:2}}>{c.name}</div>
+                            <div style={{fontSize:'0.7rem',color:'var(--text-muted)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.email}</div>
+                          </div>
                           <select value={c.status||'active'} onChange={e=>updateCustomerStatus(c.id,e.target.value)}
-                            style={{padding:'4px 8px',background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:'var(--radius)',color:c.status==='banned'?'#e04444':c.status==='suspended'?'#f59e0b':'#4cc9a8',fontSize:'0.65rem',fontWeight:600}}>
+                            style={{padding:'4px 8px',background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:'var(--radius)',color:c.status==='banned'?'#e04444':c.status==='suspended'?'#f59e0b':'#4cc9a8',fontSize:'0.6rem',fontWeight:600,flexShrink:0}}>
                             <option value="active">{t.active||'Active'}</option>
                             <option value="suspended">{t.suspended||'Suspended'}</option>
                             <option value="banned">{t.banned||'Banned'}</option>
                           </select>
-                        </td>
-                      </tr>
+                        </div>
+                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px 12px',fontSize:'0.68rem'}}>
+                          <div style={{display:'flex',alignItems:'center',gap:6,color:'var(--text-secondary)'}}>
+                            <Phone size={12} style={{color:'var(--text-muted)',flexShrink:0}}/> {c.phone||'—'}
+                          </div>
+                          <div style={{display:'flex',alignItems:'center',gap:6,color:'var(--text-secondary)'}}>
+                            <MapPin size={12} style={{color:'var(--text-muted)',flexShrink:0}}/> <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.location||'—'}</span>
+                          </div>
+                        </div>
+                        <div style={{display:'flex',gap:12,marginTop:10,paddingTop:10,borderTop:'1px solid var(--border-subtle)',fontSize:'0.62rem'}}>
+                          <div style={{textAlign:'center',flex:1}}>
+                            <div style={{fontWeight:700,color:'var(--text-primary)',fontSize:'0.85rem'}}>{c.bidCount}</div>
+                            <div style={{color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em'}}>{t.totalBids||'Bids'}</div>
+                          </div>
+                          <div style={{textAlign:'center',flex:1}}>
+                            <div style={{fontWeight:700,color:'var(--text-primary)',fontSize:'0.85rem'}}>{c.auctionCount}</div>
+                            <div style={{color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em'}}>{t.totalAuctionsParticipated||'Auctions'}</div>
+                          </div>
+                          <div style={{textAlign:'center',flex:1}}>
+                            <div style={{fontWeight:700,color:'var(--gold)',fontSize:'0.85rem'}}>{c.wonCount}</div>
+                            <div style={{color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em'}}>{t.totalWins||'Wins'}</div>
+                          </div>
+                        </div>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
-              </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
 
         {section==='completed' && (
           <div>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:24}}>
-              <h2 style={{fontFamily:'var(--font-display)',fontSize:'1.3rem',fontWeight:300,margin:0}}>{t.completedAuctions||'Completed Auctions'}</h2>
-              <button className="btn btn-outline" style={{fontSize:'0.65rem',padding:'7px 14px'}} onClick={loadCompletedAuctions}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:isMobile?16:24,gap:8}}>
+              <h2 style={{fontFamily:'var(--font-display)',fontSize:isMobile?'1.1rem':'1.3rem',fontWeight:300,margin:0}}>{t.completedAuctions||'Completed Auctions'}</h2>
+              <button className="btn btn-outline" style={{fontSize:'0.6rem',padding:isMobile?'6px 10px':'7px 14px',flexShrink:0}} onClick={loadCompletedAuctions}>
                 <RefreshCcw size={12}/> {t.refresh||'Refresh'}
               </button>
             </div>
             {completedLoading ? <div style={{textAlign:'center',padding:40,color:'var(--text-muted)'}}>{t.loading||'Loading...'}</div> : (
-              <div style={{display:'flex',flexDirection:'column',gap:16}}>
+              <div style={{display:'flex',flexDirection:'column',gap:isMobile?10:16}}>
                 {completedAucts.length===0 ? (
-                  <div style={{textAlign:'center',padding:60,color:'var(--text-muted)'}}>No completed auctions</div>
+                  <div style={{textAlign:'center',padding:isMobile?40:60,color:'var(--text-muted)'}}>No completed auctions</div>
                 ) : completedAucts.map(a=>(
                   <div key={a.id} style={{background:'var(--bg-card)',border:'1px solid var(--border-subtle)',borderRadius:'var(--radius-lg,12px)',overflow:'hidden'}}>
-                    <div style={{display:'flex',gap:16,padding:'16px 20px',cursor:'pointer',alignItems:'center'}} onClick={()=>setExpandedAuction(expandedAuction===a.id?null:a.id)}>
-                      {a.image_url && <img src={a.image_url} alt="" style={{width:50,height:50,objectFit:'cover',borderRadius:'var(--radius)',flexShrink:0}}/>}
+                    <div style={{display:'flex',gap:isMobile?10:16,padding:isMobile?'12px 14px':'16px 20px',cursor:'pointer',alignItems:'center'}} onClick={()=>setExpandedAuction(expandedAuction===a.id?null:a.id)}>
+                      {a.image_url && <img src={a.image_url} alt="" style={{width:isMobile?40:50,height:isMobile?40:50,objectFit:'cover',borderRadius:'var(--radius)',flexShrink:0}}/>}
                       <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontWeight:500,color:'var(--text-primary)',marginBottom:2}}>{a.name}</div>
-                        <div style={{fontSize:'0.7rem',color:'var(--text-muted)'}}>{a.brand} • {a.totalBids} {t.totalBids||'bids'}</div>
+                        <div style={{fontWeight:500,color:'var(--text-primary)',marginBottom:2,fontSize:isMobile?'0.8rem':'inherit',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{a.name}</div>
+                        <div style={{fontSize:isMobile?'0.62rem':'0.7rem',color:'var(--text-muted)'}}>
+                          {a.brand} • {a.totalBids} {t.totalBids||'bids'}
+                        </div>
                       </div>
                       <div style={{textAlign:'right',flexShrink:0}}>
-                        <div style={{fontWeight:600,color:'var(--gold)',fontSize:'1rem'}}>${Number(a.finalPrice).toLocaleString()}</div>
-                        <div style={{fontSize:'0.65rem',color:a.winner?'#4cc9a8':'var(--text-muted)'}}>{a.winner?(a.winner.profile?.name||a.winner.user_name):(t.noWinner||'No Winner')}</div>
+                        <div style={{fontWeight:600,color:'var(--gold)',fontSize:isMobile?'0.85rem':'1rem'}}>${Number(a.finalPrice).toLocaleString()}</div>
+                        <div style={{fontSize:isMobile?'0.58rem':'0.65rem',color:a.winner?'#4cc9a8':'var(--text-muted)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:isMobile?90:'none'}}>{a.winner?(a.winner.profile?.name||a.winner.user_name):(t.noWinner||'No Winner')}</div>
                       </div>
-                      <ChevronDown size={16} style={{color:'var(--text-muted)',transform:expandedAuction===a.id?'rotate(180deg)':'',transition:'transform 0.2s'}}/>
+                      <ChevronDown size={isMobile?14:16} style={{color:'var(--text-muted)',transform:expandedAuction===a.id?'rotate(180deg)':'',transition:'transform 0.2s',flexShrink:0}}/>
                     </div>
                     {expandedAuction===a.id && (
-                      <div style={{padding:'0 20px 20px',borderTop:'1px solid var(--border-subtle)'}}>
-                        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:16,paddingTop:16}}>
+                      <div style={{padding:isMobile?'0 14px 14px':'0 20px 20px',borderTop:'1px solid var(--border-subtle)'}}>
+                        <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr 1fr':'repeat(auto-fit,minmax(200px,1fr))',gap:isMobile?10:16,paddingTop:isMobile?12:16}}>
                           <div>
                             <Label>{t.auctionStartDate||'Start Date'}</Label>
-                            <div style={{fontSize:'0.8rem',color:'var(--text-primary)'}}>{new Date(a.start_date).toLocaleString()}</div>
+                            <div style={{fontSize:isMobile?'0.72rem':'0.8rem',color:'var(--text-primary)'}}>{new Date(a.start_date).toLocaleDateString()}</div>
                           </div>
                           <div>
                             <Label>{t.auctionEndDate||'End Date'}</Label>
-                            <div style={{fontSize:'0.8rem',color:'var(--text-primary)'}}>{new Date(a.end_date).toLocaleString()}</div>
+                            <div style={{fontSize:isMobile?'0.72rem':'0.8rem',color:'var(--text-primary)'}}>{new Date(a.end_date).toLocaleDateString()}</div>
                           </div>
                           <div>
                             <Label>{t.startingPrice||'Starting Price'}</Label>
-                            <div style={{fontSize:'0.8rem',color:'var(--text-primary)'}}>${Number(a.starting_price).toLocaleString()}</div>
+                            <div style={{fontSize:isMobile?'0.72rem':'0.8rem',color:'var(--text-primary)'}}>${Number(a.starting_price).toLocaleString()}</div>
                           </div>
                           <div>
                             <Label>{t.finalPrice||'Final Price'}</Label>
-                            <div style={{fontSize:'0.8rem',color:'var(--gold)',fontWeight:600}}>${Number(a.finalPrice).toLocaleString()}</div>
+                            <div style={{fontSize:isMobile?'0.72rem':'0.8rem',color:'var(--gold)',fontWeight:600}}>${Number(a.finalPrice).toLocaleString()}</div>
                           </div>
                         </div>
                         {a.winner && a.winner.profile && (
-                          <div style={{marginTop:20,padding:16,background:'rgba(201,168,76,0.05)',borderRadius:'var(--radius)',border:'1px solid rgba(201,168,76,0.15)'}}>
+                          <div style={{marginTop:isMobile?14:20,padding:isMobile?12:16,background:'rgba(201,168,76,0.05)',borderRadius:'var(--radius)',border:'1px solid rgba(201,168,76,0.15)'}}>
                             <Label>{t.winner||'Winner'}</Label>
-                            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:12,marginTop:8}}>
+                            <div style={{display:'flex',flexDirection:'column',gap:isMobile?8:10,marginTop:8}}>
                               <div style={{display:'flex',alignItems:'center',gap:8}}>
-                                <Users size={14} style={{color:'var(--gold)'}}/>
-                                <span style={{fontSize:'0.8rem',color:'var(--text-primary)'}}>{a.winner.profile.name}</span>
+                                <Users size={isMobile?12:14} style={{color:'var(--gold)',flexShrink:0}}/>
+                                <span style={{fontSize:isMobile?'0.75rem':'0.8rem',color:'var(--text-primary)',fontWeight:500}}>{a.winner.profile.name}</span>
                               </div>
                               <div style={{display:'flex',alignItems:'center',gap:8}}>
-                                <Mail size={14} style={{color:'var(--gold)'}}/>
-                                <span style={{fontSize:'0.8rem',color:'var(--text-secondary)'}}>{a.winner.profile.email}</span>
+                                <Mail size={isMobile?12:14} style={{color:'var(--gold)',flexShrink:0}}/>
+                                <span style={{fontSize:isMobile?'0.72rem':'0.8rem',color:'var(--text-secondary)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{a.winner.profile.email}</span>
                               </div>
-                              <div style={{display:'flex',alignItems:'center',gap:8}}>
-                                <Phone size={14} style={{color:'var(--gold)'}}/>
-                                <span style={{fontSize:'0.8rem',color:'var(--text-secondary)'}}>{a.winner.profile.phone||'—'}</span>
+                              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                                <div style={{display:'flex',alignItems:'center',gap:6}}>
+                                  <Phone size={isMobile?12:14} style={{color:'var(--gold)',flexShrink:0}}/>
+                                  <span style={{fontSize:isMobile?'0.72rem':'0.8rem',color:'var(--text-secondary)'}}>{a.winner.profile.phone||'—'}</span>
+                                </div>
+                                <div style={{display:'flex',alignItems:'center',gap:6}}>
+                                  <MapPin size={isMobile?12:14} style={{color:'var(--gold)',flexShrink:0}}/>
+                                  <span style={{fontSize:isMobile?'0.72rem':'0.8rem',color:'var(--text-secondary)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{a.winner.profile.location||'—'}</span>
+                                </div>
                               </div>
-                              <div style={{display:'flex',alignItems:'center',gap:8}}>
-                                <MapPin size={14} style={{color:'var(--gold)'}}/>
-                                <span style={{fontSize:'0.8rem',color:'var(--text-secondary)'}}>{a.winner.profile.location||'—'}</span>
-                              </div>
-                              <div style={{display:'flex',alignItems:'center',gap:8}}>
-                                <DollarSign size={14} style={{color:'var(--gold)'}}/>
-                                <span style={{fontSize:'0.8rem',fontWeight:600,color:'var(--gold)'}}>${Number(a.winner.amount).toLocaleString()}</span>
+                              <div style={{display:'flex',alignItems:'center',gap:8,marginTop:4,padding:'8px 0',borderTop:'1px solid var(--border-subtle)'}}>
+                                <DollarSign size={isMobile?12:14} style={{color:'var(--gold)',flexShrink:0}}/>
+                                <span style={{fontSize:isMobile?'0.85rem':'0.9rem',fontWeight:700,color:'var(--gold)'}}>${Number(a.winner.amount).toLocaleString()}</span>
                               </div>
                             </div>
                           </div>
                         )}
-                        <div style={{display:'flex',gap:12,marginTop:16,flexWrap:'wrap'}}>
+                        <div style={{display:'flex',gap:12,marginTop:isMobile?12:16,flexWrap:'wrap'}}>
                           {a.order ? (
                             <div style={{display:'flex',alignItems:'center',gap:8}}>
                               <StatusBadge status={a.order.status}/>
-                              <span style={{fontSize:'0.7rem',color:'var(--text-muted)'}}>{a.order.order_number}</span>
+                              <span style={{fontSize:'0.68rem',color:'var(--text-muted)'}}>{a.order.order_number}</span>
                             </div>
                           ) : a.winner ? (
-                            <span style={{fontSize:'0.7rem',color:'var(--text-muted)',fontStyle:'italic'}}>{t.pending||'Pending'} — {t.noOrders||'No order yet'}</span>
+                            <span style={{fontSize:'0.68rem',color:'var(--text-muted)',fontStyle:'italic'}}>{t.pending||'Pending'} — {t.noOrders||'No order yet'}</span>
                           ) : null}
                         </div>
                       </div>
