@@ -130,6 +130,7 @@ function checkAuctionStarts() {
         message: `${auction.name} auction is now live.`,
         imageUrl: image,
         actionUrl: `/admin`,
+        dedupKey: 'admin_started',
         title_ar: 'بدأ المزاد',
         message_ar: `مزاد ${auction.name} مباشر الآن.`
       })

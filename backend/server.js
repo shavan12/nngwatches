@@ -653,6 +653,19 @@ app.post('/api/admin/notifications/:id/read',admin,(req,res)=>{
   res.json({success: true, message:'Marked as read'})
 })
 
+// Clear all admin notifications
+app.delete('/api/admin/notifications/clear-all',admin,(req,res)=>{
+  const count=notificationService.clearAllAdminNotifications(req.user.id)
+  res.json({success: true, count, message:`Cleared ${count} admin notifications`})
+})
+
+// Delete single admin notification
+app.delete('/api/admin/notifications/:id',admin,(req,res)=>{
+  const ok=notificationService.deleteNotification(Number(req.params.id),req.user.id)
+  if(!ok) return res.status(404).json({error:'Not found'})
+  res.json({success: true, message:'Deleted'})
+})
+
 // Admin: manually re-announce an auction
 app.post('/api/admin/auctions/:id/announce',admin,(req,res)=>{
   const a=db.byId('auctions',Number(req.params.id))

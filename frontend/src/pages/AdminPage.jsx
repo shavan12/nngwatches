@@ -619,6 +619,38 @@ export default function AdminPage() {
     } catch {}
   }
 
+  const markAllAdminNotifsRead = async () => {
+    try {
+      await api('/admin/notifications/read-all', { method: 'PATCH' })
+      setAdminNotifs(prev => prev.map(n => ({ ...n, is_read: 1 })))
+      addToast(t.allMarkedRead || 'All marked as read')
+    } catch {
+      addToast('Error', 'error')
+    }
+  }
+
+  const clearAllAdminNotifs = async () => {
+    if (!window.confirm('Delete all admin notifications?')) return
+    try {
+      await api('/admin/notifications/clear-all', { method: 'DELETE' })
+      setAdminNotifs([])
+      addToast('All notifications cleared')
+    } catch {
+      addToast('Error', 'error')
+    }
+  }
+
+  const deleteAdminNotif = async (e, id) => {
+    e.stopPropagation()
+    try {
+      await api(`/admin/notifications/${id}`, { method: 'DELETE' })
+      setAdminNotifs(prev => prev.filter(n => n.id !== id))
+      addToast('Notification deleted')
+    } catch {
+      addToast('Error', 'error')
+    }
+  }
+
   const announceAuction = async (auctionId) => {
     try {
       await api(`/admin/auctions/${auctionId}/announce`, { method: 'POST' })
@@ -944,31 +976,63 @@ export default function AdminPage() {
 
         {section==='notifications' && (
           <div>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
-              <h2 style={{fontFamily:'var(--font-display)',fontSize:'1.3rem',fontWeight:400}}>Admin Notifications</h2>
-              <button className="btn btn-outline" style={{fontSize:'0.65rem',padding:'8px 14px'}} onClick={loadAdminNotifs}>
-                <RefreshCcw size={14}/> Refresh
-              </button>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,flexWrap:'wrap',marginBottom:20}}>
+              <div>
+                <h2 style={{fontFamily:'var(--font-display)',fontSize:'1.3rem',fontWeight:400,margin:0}}>{t.notifications || 'Admin Notifications'}</h2>
+                <div style={{fontSize:'0.72rem',color:'var(--text-muted)',marginTop:4}}>
+                  {adminNotifs.filter(n=>!n.is_read).length} {t.unread || 'unread'} • {adminNotifs.length} {t.total || 'total'}
+                </div>
+              </div>
+              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                {adminNotifs.some(n=>!n.is_read) && (
+                  <button className="btn btn-outline" style={{fontSize:'0.65rem',padding:'8px 14px'}} onClick={markAllAdminNotifsRead}>
+                    <CheckCheck size={14}/> {t.markAllRead || 'Mark All Read'}
+                  </button>
+                )}
+                {adminNotifs.length > 0 && (
+                  <button className="btn btn-outline" style={{fontSize:'0.65rem',padding:'8px 14px',color:'#e04444',borderColor:'rgba(224,68,68,0.3)'}} onClick={clearAllAdminNotifs}>
+                    <Trash2 size={14}/> {t.clearAll || 'Clear All'}
+                  </button>
+                )}
+                <button className="btn btn-outline" style={{fontSize:'0.65rem',padding:'8px 14px'}} onClick={loadAdminNotifs}>
+                  <RefreshCcw size={14}/> {t.refresh || 'Refresh'}
+                </button>
+              </div>
             </div>
-            {adminNotifsLoading && <div style={{textAlign:'center',padding:40,color:'var(--text-muted)'}}>Loading...</div>}
+            {adminNotifsLoading && <div style={{textAlign:'center',padding:40,color:'var(--text-muted)'}}>{t.loading || 'Loading...'}</div>}
             <div className="admin-notif-list">
               {adminNotifs.map(notif => (
                 <div key={notif.id} className={`admin-notif-item ${notif.is_read ? '' : 'unread'}`} onClick={() => markAdminNotifRead(notif.id)}>
-                  <div style={{width:36,height:36,borderRadius:'50%',background:'var(--gold-muted)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,color:'var(--gold)'}}>
+                  <div style={{width:38,height:38,borderRadius:'50%',background:'var(--gold-soft, rgba(201,168,76,0.1))',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,color:'var(--gold)'}}>
                     {notif.type==='ADMIN_NEW_BID' ? <TrendingUp size={16}/> : notif.type==='ADMIN_AUCTION_STARTED' ? <Megaphone size={16}/> : <Gavel size={16}/>}
                   </div>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:'0.78rem',fontWeight:600,color:'var(--text-primary)',marginBottom:2}}>{notif.title}</div>
-                    <div style={{fontSize:'0.7rem',color:'var(--text-secondary)',lineHeight:1.4}}>{notif.message}</div>
-                    <div style={{fontSize:'0.6rem',color:'var(--text-muted)',marginTop:4}}>{notif.created_at}</div>
+                    <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:3,flexWrap:'wrap'}}>
+                      <span style={{fontSize:'0.82rem',fontWeight:600,color:'var(--text-primary)'}}>{notif.title}</span>
+                      {!notif.is_read && (
+                        <span style={{fontSize:'0.58rem',padding:'2px 7px',borderRadius:10,background:'var(--gold)',color:'#000',fontWeight:700,letterSpacing:'0.04em'}}>
+                          {t.newBadge || 'NEW'}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{fontSize:'0.75rem',color:'var(--text-secondary)',lineHeight:1.45}}>{notif.message}</div>
+                    <div style={{fontSize:'0.65rem',color:'var(--text-muted)',marginTop:4}}>{notif.created_at}</div>
                   </div>
-                  {!notif.is_read && <div style={{width:8,height:8,borderRadius:'50%',background:'var(--gold)',flexShrink:0,marginTop:6}}/>}
+                  <button
+                    onClick={(e) => deleteAdminNotif(e, notif.id)}
+                    style={{background:'none',border:'none',color:'var(--text-muted)',cursor:'pointer',padding:6,borderRadius:4,transition:'color 0.15s',flexShrink:0}}
+                    onMouseEnter={e => e.currentTarget.style.color = '#e04444'}
+                    onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+                    title={t.delete || 'Delete'}
+                  >
+                    <Trash2 size={15}/>
+                  </button>
                 </div>
               ))}
               {!adminNotifsLoading && adminNotifs.length===0 && (
-                <div style={{textAlign:'center',padding:40,color:'var(--text-muted)',fontSize:'0.8rem'}}>
-                  <Bell size={32} strokeWidth={1} style={{marginBottom:8,opacity:0.5}}/>
-                  <div>No admin notifications yet</div>
+                <div style={{textAlign:'center',padding:50,color:'var(--text-muted)',fontSize:'0.85rem'}}>
+                  <Bell size={36} strokeWidth={1} style={{marginBottom:10,opacity:0.5}}/>
+                  <div>{t.noNotifications || 'No admin notifications'}</div>
                 </div>
               )}
             </div>

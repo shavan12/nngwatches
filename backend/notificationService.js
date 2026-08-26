@@ -148,11 +148,12 @@ function createForParticipants(auctionId, type, data, excludeUserId = null) {
   return results
 }
 
-// Create admin-only notification
-function createAdminNotification(type, { auctionId = null, title, message, imageUrl = '', actionUrl = '', title_ar = '', message_ar = '' } = {}) {
+// Create admin-only notification (with deduplication)
+function createAdminNotification(type, { auctionId = null, title, message, imageUrl = '', actionUrl = '', dedupKey = '', title_ar = '', message_ar = '' } = {}) {
   const admins = db.all('users').filter(u => u.role === 'admin')
   const results = []
   for (const a of admins) {
+    if (isDuplicate(a.id, type, auctionId, dedupKey)) continue
     const n = db.insert('notifications', {
       user_id: a.id,
       type,
@@ -165,6 +166,7 @@ function createAdminNotification(type, { auctionId = null, title, message, image
       action_url: actionUrl || '',
       is_read: 0,
     })
+    recordDedup(a.id, type, auctionId, dedupKey)
     if (sse) sse.sendToUser(a.id, 'notification', n)
     if (push) push.sendToUser(a.id, { title, body: message || '', url: actionUrl || '/admin', tag: `admin-${type}-${auctionId||n.id}`, notificationId: n.id }).catch(()=>{})
     results.push(n)
@@ -246,6 +248,15 @@ function getAdminNotifications(userId, { limit = 30, offset = 0 } = {}) {
   return { data: list.slice(offset, offset + limit), total: list.length }
 }
 
+// Clear all admin notifications
+function clearAllAdminNotifications(userId) {
+  const adminNotifs = db.all('notifications').filter(n => n.user_id == userId && n.type.startsWith('ADMIN_'))
+  for (const n of adminNotifs) {
+    db.delete('notifications', n.id)
+  }
+  return adminNotifs.length
+}
+
 // Get user notification preferences
 function getPreferences(userId) {
   const pref = db.get('notification_preferences', { user_id: userId })
@@ -314,6 +325,7 @@ module.exports = {
   markAllRead,
   deleteNotification,
   getAdminNotifications,
+  clearAllAdminNotifications,
   getPreferences,
   updatePreferences,
   getAuctionParticipants,

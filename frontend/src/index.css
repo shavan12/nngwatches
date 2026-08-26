@@ -1047,19 +1047,20 @@ input, select, textarea { font-size: 16px; }
 }
 .admin-notif-item {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 14px 16px;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: var(--transition);
+  text-align: start;
 }
 .admin-notif-item:hover { border-color: var(--border); }
 .admin-notif-item.unread {
-  border-left: 3px solid var(--gold);
-  background: rgba(201,168,76,0.03);
+  border-inline-start: 3px solid var(--gold);
+  background: rgba(201,168,76,0.04);
 }
 
 /* ── Mobile responsive ───────────────────────── */
