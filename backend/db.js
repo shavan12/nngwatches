@@ -64,6 +64,15 @@ const db = {
     state[table][i] = {...state[table][i], ...data, updated_at:now()}
     save(); return state[table][i]
   },
+  updateWhere(table, filter={}, data={}) {
+    const rows = (state[table]||[]).filter(r => Object.entries(filter).every(([k,v]) => r[k]==v))
+    for (const row of rows) {
+      Object.assign(row, data)
+      if (['products','orders','notifications'].includes(table)) row.updated_at = now()
+    }
+    if (rows.length > 0) save()
+    return rows.length
+  },
   delete(table, id) {
     const before = state[table].length
     state[table] = state[table].filter(r=>r.id!=id)
@@ -75,6 +84,7 @@ const db = {
   },
   count(table, filter={}) { return db.all(table,filter).length },
   sum(table, field, filter={}) { return db.all(table,filter).reduce((s,r)=>s+(Number(r[field])||0),0) },
+  save,
   state,
 }
 

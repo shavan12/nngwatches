@@ -172,10 +172,15 @@ function createAdminNotification(type, { auctionId = null, title, message, image
   return results
 }
 
+// Helper to check if notification is unread
+function isUnread(n) {
+  return !n.is_read || n.is_read === 0 || n.is_read === '0' || n.is_read === false
+}
+
 // Get notifications for a user
 function getUserNotifications(userId, { limit = 30, offset = 0, type = '' } = {}) {
-  let list = db.all('notifications', { user_id: userId })
-  // Exclude admin types from regular users
+  let list = db.all('notifications').filter(n => n.user_id == userId)
+  // Exclude admin types from regular customer view
   list = list.filter(n => !n.type.startsWith('ADMIN_'))
   if (type) {
     // Support type groups
@@ -189,47 +194,55 @@ function getUserNotifications(userId, { limit = 30, offset = 0, type = '' } = {}
       list = list.filter(n => n.type === type)
     }
   }
-  list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+  list.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
   return { data: list.slice(offset, offset + limit), total: list.length }
 }
 
 // Get unread count for a user
 function getUnreadCount(userId) {
-  const list = db.all('notifications', { user_id: userId })
-    .filter(n => !n.type.startsWith('ADMIN_') && n.is_read === 0)
+  const list = db.all('notifications')
+    .filter(n => n.user_id == userId && !n.type.startsWith('ADMIN_') && isUnread(n))
   return list.length
 }
 
 // Mark a single notification as read (with ownership check)
 function markRead(notificationId, userId) {
   const n = db.byId('notifications', notificationId)
-  if (!n || n.user_id !== userId) return false
+  if (!n || n.user_id != userId) return false
   db.update('notifications', notificationId, { is_read: 1 })
   return true
 }
 
 // Mark all notifications as read for a user
 function markAllRead(userId) {
-  const list = db.all('notifications', { user_id: userId }).filter(n => n.is_read === 0)
-  for (const n of list) {
-    db.update('notifications', n.id, { is_read: 1 })
+  const allNotifs = db.all('notifications')
+  let count = 0
+  for (const n of allNotifs) {
+    if (n.user_id == userId && isUnread(n)) {
+      n.is_read = 1
+      n.updated_at = new Date().toISOString()
+      count++
+    }
   }
-  return list.length
+  if (count > 0 && db.save) {
+    db.save()
+  }
+  return count
 }
 
 // Delete a notification (with ownership check)
 function deleteNotification(notificationId, userId) {
   const n = db.byId('notifications', notificationId)
-  if (!n || n.user_id !== userId) return false
+  if (!n || n.user_id != userId) return false
   db.delete('notifications', notificationId)
   return true
 }
 
 // Get admin notifications
 function getAdminNotifications(userId, { limit = 30, offset = 0 } = {}) {
-  let list = db.all('notifications', { user_id: userId })
-    .filter(n => n.type.startsWith('ADMIN_'))
-  list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+  let list = db.all('notifications')
+    .filter(n => n.user_id == userId && n.type.startsWith('ADMIN_'))
+  list.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
   return { data: list.slice(offset, offset + limit), total: list.length }
 }
 

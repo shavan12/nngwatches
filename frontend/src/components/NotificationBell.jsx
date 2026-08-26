@@ -62,6 +62,8 @@ export default function NotificationBell() {
 
   if (!user) return null
 
+  const [marking, setMarking] = useState(false)
+
   const handleOpen = (e) => {
     e.stopPropagation()
     if (isMobile) {
@@ -84,10 +86,17 @@ export default function NotificationBell() {
 
   const handleMarkAllRead = async (e) => {
     e.stopPropagation()
-    await markAllNotificationsRead()
+    if (marking) return
+    setMarking(true)
+    try {
+      await markAllNotificationsRead()
+    } finally {
+      setMarking(false)
+    }
   }
 
   const recentNotifs = (notifications || []).slice(0, 20)
+  const hasUnread = unreadCount > 0 || recentNotifs.some(n => !n.is_read)
 
   const renderNotifItem = (notif) => {
     const config = TYPE_CONFIG[notif.type] || TYPE_CONFIG.SYSTEM
@@ -115,9 +124,9 @@ export default function NotificationBell() {
     <>
       <div className="notif-dropdown-header">
         <span className="notif-dropdown-title">{t.notifications}</span>
-        {unreadCount > 0 && (
-          <button className="notif-mark-all" onClick={handleMarkAllRead}>
-            <CheckCheck size={14} /> {t.markAllRead}
+        {hasUnread && (
+          <button className="notif-mark-all" onClick={handleMarkAllRead} disabled={marking} style={{ opacity: marking ? 0.6 : 1 }}>
+            <CheckCheck size={14} /> {marking ? (t.loading || '...') : t.markAllRead}
           </button>
         )}
       </div>

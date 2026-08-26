@@ -444,16 +444,31 @@ app.post('/api/auctions',admin,(req,res)=>{
 
   // ── Notify all users about new auction ──
   const aImg = (result.images && result.images[0]) || ''
-  notificationService.createForAllUsers(notificationService.TYPES.NEW_AUCTION, {
-    auctionId: auction.id,
-    title: 'New Auction',
-    message: `${auction.name} is now available for bidding. Starting price: $${Number(auction.starting_price).toLocaleString()}.`,
-    imageUrl: aImg,
-    actionUrl: `/auction/${auction.id}`,
-    dedupKey: 'new',
-    title_ar: 'مزاد جديد',
-    message_ar: `${auction.name} متاح الآن للمزايدة. سعر البداية: $${Number(auction.starting_price).toLocaleString()}.`
-  })
+  const timeUntilStart = startTime - Date.now()
+  if (timeUntilStart > 0) {
+    const rel = scheduler.formatTimeRemaining(timeUntilStart)
+    notificationService.createForAllUsers(notificationService.TYPES.NEW_AUCTION, {
+      auctionId: auction.id,
+      title: 'New Upcoming Auction',
+      message: `${auction.name} auction starts in ${rel.en}. Starting price: $${Number(auction.starting_price).toLocaleString()}.`,
+      imageUrl: aImg,
+      actionUrl: `/auction/${auction.id}`,
+      dedupKey: 'new',
+      title_ar: 'مزاد جديد قادم',
+      message_ar: `مزاد ${auction.name} يبدأ خلال ${rel.ar}. سعر البداية: $${Number(auction.starting_price).toLocaleString()}.`
+    })
+  } else {
+    notificationService.createForAllUsers(notificationService.TYPES.NEW_AUCTION, {
+      auctionId: auction.id,
+      title: 'New Auction Live',
+      message: `${auction.name} is now LIVE for bidding! Starting price: $${Number(auction.starting_price).toLocaleString()}.`,
+      imageUrl: aImg,
+      actionUrl: `/auction/${auction.id}`,
+      dedupKey: 'new',
+      title_ar: 'مزاد مباشر جديد',
+      message_ar: `مزاد ${auction.name} مباشر الآن للمزايدة! سعر البداية: $${Number(auction.starting_price).toLocaleString()}.`
+    })
+  }
 })
 
 // Admin: update auction
@@ -584,21 +599,30 @@ app.put('/api/notifications/preferences',auth,(req,res)=>{
 // Mark all as read (MUST be before :id/read to avoid route conflict)
 app.patch('/api/notifications/read-all',auth,(req,res)=>{
   const count=notificationService.markAllRead(req.user.id)
-  res.json({message:`Marked ${count} as read`})
+  res.json({success: true, count, unreadCount: notificationService.getUnreadCount(req.user.id), message:`Marked ${count} as read`})
+})
+app.post('/api/notifications/read-all',auth,(req,res)=>{
+  const count=notificationService.markAllRead(req.user.id)
+  res.json({success: true, count, unreadCount: notificationService.getUnreadCount(req.user.id), message:`Marked ${count} as read`})
 })
 
 // Mark single notification as read
 app.patch('/api/notifications/:id/read',auth,(req,res)=>{
   const ok=notificationService.markRead(Number(req.params.id),req.user.id)
   if(!ok) return res.status(404).json({error:'Not found or not yours'})
-  res.json({message:'Marked as read'})
+  res.json({success: true, unreadCount: notificationService.getUnreadCount(req.user.id), message:'Marked as read'})
+})
+app.post('/api/notifications/:id/read',auth,(req,res)=>{
+  const ok=notificationService.markRead(Number(req.params.id),req.user.id)
+  if(!ok) return res.status(404).json({error:'Not found or not yours'})
+  res.json({success: true, unreadCount: notificationService.getUnreadCount(req.user.id), message:'Marked as read'})
 })
 
 // Delete notification
 app.delete('/api/notifications/:id',auth,(req,res)=>{
   const ok=notificationService.deleteNotification(Number(req.params.id),req.user.id)
   if(!ok) return res.status(404).json({error:'Not found or not yours'})
-  res.json({message:'Deleted'})
+  res.json({success: true, unreadCount: notificationService.getUnreadCount(req.user.id), message:'Deleted'})
 })
 
 // Admin notifications
@@ -607,11 +631,26 @@ app.get('/api/admin/notifications',admin,(req,res)=>{
   res.json(notificationService.getAdminNotifications(req.user.id,{limit:Number(limit),offset:Number(offset)}))
 })
 
+// Mark all admin notifications as read
+app.patch('/api/admin/notifications/read-all',admin,(req,res)=>{
+  const count=notificationService.markAllRead(req.user.id)
+  res.json({success: true, count, message:`Marked ${count} as read`})
+})
+app.post('/api/admin/notifications/read-all',admin,(req,res)=>{
+  const count=notificationService.markAllRead(req.user.id)
+  res.json({success: true, count, message:`Marked ${count} as read`})
+})
+
 // Mark admin notification as read
 app.patch('/api/admin/notifications/:id/read',admin,(req,res)=>{
   const ok=notificationService.markRead(Number(req.params.id),req.user.id)
   if(!ok) return res.status(404).json({error:'Not found'})
-  res.json({message:'Marked as read'})
+  res.json({success: true, message:'Marked as read'})
+})
+app.post('/api/admin/notifications/:id/read',admin,(req,res)=>{
+  const ok=notificationService.markRead(Number(req.params.id),req.user.id)
+  if(!ok) return res.status(404).json({error:'Not found'})
+  res.json({success: true, message:'Marked as read'})
 })
 
 // Admin: manually re-announce an auction

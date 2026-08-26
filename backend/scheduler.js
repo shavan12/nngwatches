@@ -2,18 +2,53 @@ let db, notify, sse
 let intervalId = null
 
 const UPCOMING_THRESHOLDS = [
-  { key: '7d', ms: 7 * 24 * 60 * 60 * 1000, label: '7 days' },
-  { key: '3d', ms: 3 * 24 * 60 * 60 * 1000, label: '3 days' },
-  { key: '24h', ms: 24 * 60 * 60 * 1000, label: '24 hours' },
-  { key: '1h', ms: 60 * 60 * 1000, label: '1 hour' },
-  { key: '15m', ms: 15 * 60 * 1000, label: '15 minutes' },
+  { key: '15m', ms: 15 * 60 * 1000 },
+  { key: '1h',  ms: 60 * 60 * 1000 },
+  { key: '2h',  ms: 2 * 60 * 60 * 1000 },
+  { key: '3h',  ms: 3 * 60 * 60 * 1000 },
+  { key: '6h',  ms: 6 * 60 * 60 * 1000 },
+  { key: '12h', ms: 12 * 60 * 60 * 1000 },
+  { key: '24h', ms: 24 * 60 * 60 * 1000 },
+  { key: '3d',  ms: 3 * 24 * 60 * 60 * 1000 },
+  { key: '7d',  ms: 7 * 24 * 60 * 60 * 1000 },
 ]
 
 const ENDING_THRESHOLDS = [
-  { key: '24h', ms: 24 * 60 * 60 * 1000, label: '24 hours' },
-  { key: '1h', ms: 60 * 60 * 1000, label: '1 hour' },
-  { key: '15m', ms: 15 * 60 * 1000, label: '15 minutes' },
+  { key: '15m', ms: 15 * 60 * 1000 },
+  { key: '1h',  ms: 60 * 60 * 1000 },
+  { key: '3h',  ms: 3 * 60 * 60 * 1000 },
+  { key: '24h', ms: 24 * 60 * 60 * 1000 },
 ]
+
+function formatTimeRemaining(ms) {
+  if (ms <= 0) return { en: 'now', ar: 'الآن' }
+  const totalMinutes = Math.round(ms / (60 * 1000))
+  const totalHours = Math.round(ms / (60 * 60 * 1000))
+  const totalDays = Math.round(ms / (24 * 60 * 60 * 1000))
+
+  if (totalMinutes < 60) {
+    const mins = Math.max(1, totalMinutes)
+    return {
+      en: mins === 1 ? '1 minute' : `${mins} minutes`,
+      ar: mins === 1 ? 'دقيقة واحدة' : mins === 2 ? 'دقيقتين' : mins <= 10 ? `${mins} دقائق` : `${mins} دقيقة`
+    }
+  } else if (totalHours < 24) {
+    return {
+      en: totalHours === 1 ? '1 hour' : `${totalHours} hours`,
+      ar: totalHours === 1 ? 'ساعة واحدة' : totalHours === 2 ? 'ساعتين' : totalHours <= 10 ? `${totalHours} ساعات` : `${totalHours} ساعة`
+    }
+  } else if (totalDays === 1) {
+    return {
+      en: 'tomorrow',
+      ar: 'غداً'
+    }
+  } else {
+    return {
+      en: `${totalDays} days`,
+      ar: totalDays === 2 ? 'يومين' : totalDays <= 10 ? `${totalDays} أيام` : `${totalDays} يوم`
+    }
+  }
+}
 
 function resolveStatus(auction) {
   if (!auction) return 'ended'
@@ -46,21 +81,20 @@ function checkUpcomingAuctions() {
     const timeUntilStart = startTime - now
     if (timeUntilStart <= 0) continue
 
+    // Find closest ascending threshold
     for (const threshold of UPCOMING_THRESHOLDS) {
-      // Send reminder when we're within the threshold window
-      // but only if we haven't already (dedup key ensures once-only)
-      // Only fire the FIRST (largest) matching threshold, not all at once
       if (timeUntilStart <= threshold.ms) {
         const image = getAuctionImage(auction)
+        const rel = formatTimeRemaining(timeUntilStart)
         notify.createForAllUsers(notify.TYPES.UPCOMING_AUCTION, {
           auctionId: auction.id,
           title: 'Upcoming Auction',
-          message: `${auction.name} auction starts in ${threshold.label}. Starting price: $${Number(auction.starting_price).toLocaleString()}.`,
+          message: `${auction.name} auction starts in ${rel.en}. Starting price: $${Number(auction.starting_price).toLocaleString()}.`,
           imageUrl: image,
           actionUrl: `/auction/${auction.id}`,
           dedupKey: `upcoming_${threshold.key}`,
           title_ar: 'مزاد قادم',
-          message_ar: `مزاد ${auction.name} يبدأ خلال ${threshold.label === '7 days' ? '7 أيام' : threshold.label === '3 days' ? '3 أيام' : threshold.label === '24 hours' ? '24 ساعة' : threshold.label === '1 hour' ? 'ساعة واحدة' : '15 دقيقة'}. سعر البداية: $${Number(auction.starting_price).toLocaleString()}.`
+          message_ar: `مزاد ${auction.name} يبدأ خلال ${rel.ar}. سعر البداية: $${Number(auction.starting_price).toLocaleString()}.`
         })
         break // Only send the closest matching threshold
       }
@@ -120,17 +154,18 @@ function checkEndingSoon() {
         const image = getAuctionImage(auction)
         const bids = db.all('bids', { auction_id: auction.id })
         const highest = bids.length > 0 ? Math.max(...bids.map(b => b.amount)) : auction.starting_price
+        const rel = formatTimeRemaining(timeUntilEnd)
 
         // Only notify participants, not all users
         notify.createForParticipants(auction.id, notify.TYPES.AUCTION_ENDING, {
           auctionId: auction.id,
           title: 'Auction Ending Soon',
-          message: `${auction.name} auction ends in ${threshold.label}. Current bid: $${Number(highest).toLocaleString()}.`,
+          message: `${auction.name} auction ends in ${rel.en}. Current bid: $${Number(highest).toLocaleString()}.`,
           imageUrl: image,
           actionUrl: `/auction/${auction.id}`,
           dedupKey: `ending_${threshold.key}`,
           title_ar: 'المزاد ينتهي قريباً',
-          message_ar: `مزاد ${auction.name} ينتهي خلال ${threshold.label === '24 hours' ? '24 ساعة' : threshold.label === '1 hour' ? 'ساعة واحدة' : '15 دقيقة'}. المزايدة الحالية: $${Number(highest).toLocaleString()}.`
+          message_ar: `مزاد ${auction.name} ينتهي خلال ${rel.ar}. المزايدة الحالية: $${Number(highest).toLocaleString()}.`
         })
         break // Only send the closest matching threshold
       }
@@ -255,4 +290,4 @@ function stop() {
   }
 }
 
-module.exports = { start, stop }
+module.exports = { start, stop, formatTimeRemaining }

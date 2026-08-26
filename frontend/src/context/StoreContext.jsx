@@ -1020,35 +1020,51 @@ export function StoreProvider({ children }) {
   const fetchUnreadCount = useCallback(async () => {
     try {
       const res = await apiFetch("/notifications/unread-count");
-      setUnreadCount(res.count ?? 0);
+      setUnreadCount(typeof res?.count === "number" ? res.count : 0);
     } catch {}
   }, []);
 
   const markNotificationRead = useCallback(async (id) => {
     try {
-      await apiFetch(`/notifications/${id}/read`, { method: "PATCH" });
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, is_read: 1 } : n)),
       );
       setUnreadCount((prev) => Math.max(0, prev - 1));
-    } catch {}
-  }, []);
+      const res = await apiFetch(`/notifications/${id}/read`, { method: "PATCH" });
+      if (typeof res?.unreadCount === "number") {
+        setUnreadCount(res.unreadCount);
+      }
+    } catch {
+      fetchUnreadCount();
+    }
+  }, [fetchUnreadCount]);
 
   const markAllNotificationsRead = useCallback(async () => {
     try {
-      await apiFetch("/notifications/read-all", { method: "PATCH" });
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: 1 })));
       setUnreadCount(0);
-    } catch {}
-  }, []);
+      const res = await apiFetch("/notifications/read-all", { method: "PATCH" });
+      if (typeof res?.unreadCount === "number") {
+        setUnreadCount(res.unreadCount);
+      }
+    } catch (err) {
+      console.error("Failed to mark all notifications read:", err);
+      fetchUnreadCount();
+    }
+  }, [fetchUnreadCount]);
 
   const deleteNotification = useCallback(async (id) => {
     try {
-      await apiFetch(`/notifications/${id}`, { method: "DELETE" });
       setNotifications((prev) => prev.filter((n) => n.id !== id));
       setUnreadCount((prev) => Math.max(0, prev - 1));
-    } catch {}
-  }, []);
+      const res = await apiFetch(`/notifications/${id}`, { method: "DELETE" });
+      if (typeof res?.unreadCount === "number") {
+        setUnreadCount(res.unreadCount);
+      }
+    } catch {
+      fetchUnreadCount();
+    }
+  }, [fetchUnreadCount]);
 
   // SSE connection for real-time notifications
   useEffect(() => {

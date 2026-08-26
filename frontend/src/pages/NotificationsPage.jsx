@@ -122,12 +122,29 @@ export default function NotificationsPage() {
     )
   }
 
+  const [markingAll, setMarkingAll] = useState(false)
+
+  const handleMarkAll = async () => {
+    if (markingAll) return
+    setMarkingAll(true)
+    try {
+      await markAllNotificationsRead()
+      addToast(t.allMarkedRead || 'All notifications marked as read')
+    } catch {
+      addToast(t.error || 'Failed to mark notifications read', 'error')
+    } finally {
+      setMarkingAll(false)
+    }
+  }
+
   const tabs = [
     { key: 'all', label: t.all || 'All' },
     { key: 'auctions', label: t.auctions || 'Auctions' },
     { key: 'bids', label: t.bids || 'Bids' },
     { key: 'results', label: t.results || 'Results' },
   ]
+
+  const hasUnread = unreadCount > 0 || (notifications || []).some(n => !n.is_read)
 
   return (
     <div dir={dir} style={{ maxWidth: 720, margin: '0 auto', padding: 'clamp(16px, 4vw, 40px) clamp(12px, 3vw, 20px) 80px' }}>
@@ -138,9 +155,9 @@ export default function NotificationsPage() {
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.3rem, 5vw, 2rem)', fontWeight: 300, margin: 0 }}>{t.notifications || 'Notifications'}</h1>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {unreadCount > 0 && (
-            <button className="btn btn-outline" style={{ fontSize: '0.65rem', padding: '7px 12px' }} onClick={markAllNotificationsRead}>
-              <CheckCheck size={14} /> {t.markAllRead || 'Mark All Read'}
+          {hasUnread && (
+            <button className="btn btn-outline" style={{ fontSize: '0.65rem', padding: '7px 12px', opacity: markingAll ? 0.6 : 1 }} onClick={handleMarkAll} disabled={markingAll}>
+              <CheckCheck size={14} /> {markingAll ? (t.loading || '...') : (t.markAllRead || 'Mark All Read')}
             </button>
           )}
           <button
