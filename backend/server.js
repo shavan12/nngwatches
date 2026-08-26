@@ -165,7 +165,22 @@ app.delete('/api/products/:id',admin,(req,res)=>{
 // ════════ ORDERS ════════
 app.get('/api/orders',admin,(req,res)=>{
   const orders=db.all('orders').sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))
-  orders.forEach(o=>{o.item_count=db.count('order_items',{order_id:o.id})})
+  orders.forEach(o=>{
+    o.item_count=db.count('order_items',{order_id:o.id})
+    o.items=db.all('order_items',{order_id:o.id})
+    const user = (o.user_id ? db.byId('users', o.user_id) : null) || db.get('users', { email: o.customer_email })
+    o.customer_profile = {
+      name: o.customer_name || user?.name || '—',
+      email: o.customer_email || user?.email || '—',
+      phone: o.customer_phone || user?.phone || '—',
+      location: o.shipping_address ? `${o.shipping_address}, ${o.city || ''}, ${o.country || ''}`.replace(/^,\s*|,\s*$/g, '') : (user?.location || `${o.city || ''}, ${o.country || ''}`.replace(/^,\s*|,\s*$/g, '') || '—'),
+      city: o.city || '',
+      country: o.country || '',
+      shipping_address: o.shipping_address || '',
+      user_id: user?.id || o.user_id || null,
+      account_status: user?.status || 'active'
+    }
+  })
   res.json({data:orders,total:orders.length})
 })
 app.get('/api/orders/:id',admin,(req,res)=>{

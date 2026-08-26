@@ -308,40 +308,127 @@ function ProductModal({ product, onClose, onSave, brands, categories, uploadImag
   )
 }
 
-// ── Order card for mobile ─────────────────────────────────
-function OrderCard({ order, onStatusChange }) {
+// ── Order Card (Expanded with full customer & order details) ──
+function OrderCard({ order, onStatusChange, t = {}, dir = 'ltr', isMobile = false }) {
   const [open, setOpen] = useState(false)
+  const cust = order.customer_profile || {}
+  const customerName = cust.name || order.customer_name || '—'
+  const customerEmail = cust.email || order.customer_email || '—'
+  const customerPhone = cust.phone || order.customer_phone || '—'
+  const customerLocation = cust.location || (order.shipping_address ? `${order.shipping_address}, ${order.city || ''}, ${order.country || ''}`.replace(/^,\s*|,\s*$/g, '') : `${order.city || ''}, ${order.country || ''}`.replace(/^,\s*|,\s*$/g, '') || '—')
+
   return (
-    <div style={{background:'var(--bg-card)',border:'1px solid var(--border-subtle)',borderRadius:'var(--radius-md)',overflow:'hidden',marginBottom:10}}>
-      <div style={{padding:'14px 16px',display:'flex',alignItems:'center',gap:12,cursor:'pointer'}} onClick={()=>setOpen(!open)}>
+    <div style={{background:'var(--bg-card)',border:'1px solid var(--border-subtle)',borderRadius:'var(--radius-lg, 12px)',overflow:'hidden',marginBottom:14}}>
+      {/* Clickable Header */}
+      <div style={{padding:isMobile?'12px 14px':'16px 20px',display:'flex',alignItems:'center',gap:isMobile?10:16,cursor:'pointer'}} onClick={()=>setOpen(!open)}>
         <div style={{flex:1,minWidth:0}}>
-          <div style={{fontFamily:'monospace',fontSize:'0.72rem',color:'var(--gold)',marginBottom:4}}>{order.order_number}</div>
-          <div style={{fontSize:'0.85rem',fontWeight:500,color:'var(--text-primary)',marginBottom:2}}>{order.customer_name}</div>
-          <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-            <span style={{fontSize:'0.75rem',fontWeight:600,color:'var(--off-white)'}}>${Number(order.total).toLocaleString()}</span>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4,flexWrap:'wrap'}}>
+            <span style={{fontFamily:'monospace',fontSize:isMobile?'0.7rem':'0.78rem',color:'var(--gold)',fontWeight:600}}>{order.order_number}</span>
             <StatusBadge status={order.status}/>
           </div>
-        </div>
-        <ChevronDown size={16} style={{color:'var(--text-muted)',transform:open?'rotate(180deg)':'none',transition:'transform 0.2s',flexShrink:0}}/>
-      </div>
-      {open && (
-        <div style={{padding:'0 16px 16px',borderTop:'1px solid var(--border-subtle)',paddingTop:14}}>
-          <div style={{fontSize:'0.75rem',color:'var(--text-muted)',marginBottom:4}}>{order.customer_email}</div>
-          <div style={{fontSize:'0.75rem',color:'var(--text-muted)',marginBottom:12}}>{order.city}, {order.country} · {order.created_at?.slice(0,10)}</div>
-          <Label>Update Status</Label>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:6,marginTop:6}}>
-            {['pending','processing','shipped','delivered','cancelled'].map(s => (
-              <button key={s} onClick={()=>onStatusChange(order.id,s)} style={{
-                padding:'8px 4px', borderRadius:'var(--radius-sm)', cursor:'pointer',
-                border:`1px solid ${order.status===s?'var(--gold)':'var(--border-subtle)'}`,
-                background: order.status===s ? 'var(--gold-muted)' : 'var(--bg-elevated)',
-                color: order.status===s ? 'var(--gold)' : 'var(--text-secondary)',
-                fontSize:'0.6rem', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em',
-              }}>
-                {s}
-              </button>
-            ))}
+          <div style={{fontSize:isMobile?'0.85rem':'0.95rem',fontWeight:600,color:'var(--text-primary)',marginBottom:2}}>{customerName}</div>
+          <div style={{fontSize:isMobile?'0.65rem':'0.72rem',color:'var(--text-muted)'}}>
+            {order.created_at ? new Date(order.created_at).toLocaleDateString() : '—'} • {order.item_count || (order.items && order.items.length) || 1} {t.orderedItems || 'item(s)'}
           </div>
+        </div>
+        <div style={{textAlign:'right',flexShrink:0}}>
+          <div style={{fontWeight:700,color:'var(--gold)',fontSize:isMobile?'0.9rem':'1.1rem'}}>${Number(order.total).toLocaleString()}</div>
+          <div style={{fontSize:isMobile?'0.6rem':'0.68rem',color:'var(--text-muted)',textTransform:'capitalize'}}>{order.status}</div>
+        </div>
+        <ChevronDown size={isMobile?16:18} style={{color:'var(--text-muted)',transform:open?'rotate(180deg)':'none',transition:'transform 0.2s',flexShrink:0}}/>
+      </div>
+
+      {/* Expanded Details */}
+      {open && (
+        <div style={{padding:isMobile?'0 14px 16px':'0 20px 20px',borderTop:'1px solid var(--border-subtle)'}}>
+          
+          {/* Order Summary Grid */}
+          <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr 1fr':'repeat(auto-fit,minmax(180px,1fr))',gap:isMobile?10:16,paddingTop:isMobile?12:16}}>
+            <div>
+              <Label>{t.orderDate || 'Order Date'}</Label>
+              <div style={{fontSize:isMobile?'0.72rem':'0.8rem',color:'var(--text-primary)'}}>{order.created_at ? new Date(order.created_at).toLocaleString() : '—'}</div>
+            </div>
+            <div>
+              <Label>{t.subtotal || 'Subtotal'}</Label>
+              <div style={{fontSize:isMobile?'0.72rem':'0.8rem',color:'var(--text-primary)'}}>${Number(order.subtotal || order.total).toLocaleString()}</div>
+            </div>
+            <div>
+              <Label>{t.shipping || 'Shipping'}</Label>
+              <div style={{fontSize:isMobile?'0.72rem':'0.8rem',color:'var(--text-primary)'}}>${Number(order.shipping || 0).toLocaleString()}</div>
+            </div>
+            <div>
+              <Label>{t.total || 'Total'}</Label>
+              <div style={{fontSize:isMobile?'0.75rem':'0.85rem',color:'var(--gold)',fontWeight:700}}>${Number(order.total).toLocaleString()}</div>
+            </div>
+          </div>
+
+          {/* Customer Information Card (Matching Completed Auctions Design) */}
+          <div style={{marginTop:isMobile?14:18,padding:isMobile?12:16,background:'rgba(201,168,76,0.05)',borderRadius:'var(--radius)',border:'1px solid rgba(201,168,76,0.15)'}}>
+            <Label>{t.customerInfo || 'Customer Information'}</Label>
+            <div style={{display:'flex',flexDirection:'column',gap:isMobile?8:10,marginTop:8}}>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <Users size={isMobile?13:15} style={{color:'var(--gold)',flexShrink:0}}/>
+                <span style={{fontSize:isMobile?'0.78rem':'0.85rem',color:'var(--text-primary)',fontWeight:600}}>{customerName}</span>
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <Mail size={isMobile?13:15} style={{color:'var(--gold)',flexShrink:0}}/>
+                <span style={{fontSize:isMobile?'0.72rem':'0.8rem',color:'var(--text-secondary)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{customerEmail}</span>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:8}}>
+                <div style={{display:'flex',alignItems:'center',gap:6}}>
+                  <Phone size={isMobile?13:15} style={{color:'var(--gold)',flexShrink:0}}/>
+                  <span style={{fontSize:isMobile?'0.72rem':'0.8rem',color:'var(--text-secondary)'}}>{customerPhone}</span>
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:6}}>
+                  <MapPin size={isMobile?13:15} style={{color:'var(--gold)',flexShrink:0}}/>
+                  <span style={{fontSize:isMobile?'0.72rem':'0.8rem',color:'var(--text-secondary)',wordBreak:'break-word'}}>{customerLocation}</span>
+                </div>
+              </div>
+              {order.notes && (
+                <div style={{fontSize:isMobile?'0.7rem':'0.78rem',color:'var(--text-muted)',fontStyle:'italic',marginTop:4,paddingTop:6,borderTop:'1px solid rgba(201,168,76,0.1)'}}>
+                  <span style={{fontWeight:600,color:'var(--gold)'}}>{t.notes || 'Notes'}:</span> {order.notes}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Ordered Items List */}
+          {order.items && order.items.length > 0 && (
+            <div style={{marginTop:isMobile?14:18}}>
+              <Label>{t.orderedItems || 'Ordered Items'}</Label>
+              <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:6}}>
+                {order.items.map((item, idx) => (
+                  <div key={idx} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 12px',background:'var(--bg-elevated)',borderRadius:'var(--radius-sm)',fontSize:isMobile?'0.72rem':'0.78rem',border:'1px solid var(--border-subtle)'}}>
+                    <div>
+                      <div style={{fontWeight:500,color:'var(--text-primary)'}}>{item.product_name}</div>
+                      <div style={{fontSize:isMobile?'0.62rem':'0.68rem',color:'var(--text-muted)'}}>{item.brand_name} • Qty: {item.quantity}</div>
+                    </div>
+                    <div style={{fontWeight:600,color:'var(--gold)'}}>${Number(item.price * item.quantity).toLocaleString()}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Update Status Buttons */}
+          <div style={{marginTop:isMobile?14:18}}>
+            <Label>{t.updateStatus || 'Update Status'}</Label>
+            <div style={{display:'grid',gridTemplateColumns:isMobile?'repeat(3,1fr)':'repeat(5,1fr)',gap:6,marginTop:6}}>
+              {['pending','processing','shipped','delivered','cancelled'].map(s => (
+                <button key={s} onClick={()=>onStatusChange(order.id,s)} style={{
+                  padding:isMobile?'8px 4px':'10px 8px', borderRadius:'var(--radius-sm)', cursor:'pointer',
+                  border:`1px solid ${order.status===s?'var(--gold)':'var(--border-subtle)'}`,
+                  background: order.status===s ? 'var(--gold-muted)' : 'var(--bg-elevated)',
+                  color: order.status===s ? 'var(--gold)' : 'var(--text-secondary)',
+                  fontSize:isMobile?'0.6rem':'0.68rem', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em',
+                  transition:'all 0.15s ease'
+                }}>
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+
         </div>
       )}
     </div>
@@ -847,9 +934,20 @@ export default function AdminPage() {
         {/* ── ORDERS ── */}
         {section==='orders' && (
           <div style={{animation:'fadeInUp 0.4s ease'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:isMobile?16:20,gap:8,flexWrap:'wrap'}}>
+              <div>
+                <h2 style={{fontFamily:'var(--font-display)',fontSize:isMobile?'1.1rem':'1.3rem',fontWeight:300,margin:0}}>{t.orders || 'Customer Orders'}</h2>
+                <div style={{fontSize:'0.72rem',color:'var(--text-muted)',marginTop:4}}>
+                  {orders.length} {t.orders || 'orders'} • ${orders.reduce((sum, o) => sum + Number(o.total || 0), 0).toLocaleString()} {t.total || 'total'}
+                </div>
+              </div>
+              <button className="btn btn-outline" style={{fontSize:'0.65rem',padding:'7px 14px'}} onClick={loadOrders}>
+                <RefreshCcw size={14}/> {t.refresh || 'Refresh'}
+              </button>
+            </div>
             {orders.length === 0
               ? <div style={{textAlign:'center',padding:60,color:'var(--text-muted)',fontSize:'0.85rem'}}>No orders yet</div>
-              : orders.map(o => <OrderCard key={o.id} order={o} onStatusChange={updateOrderStatus}/>)
+              : orders.map(o => <OrderCard key={o.id} order={o} onStatusChange={updateOrderStatus} t={t} dir={dir} isMobile={isMobile}/>)
             }
           </div>
         )}
