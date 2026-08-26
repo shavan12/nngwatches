@@ -56,6 +56,8 @@ function checkUpcomingAuctions() {
           imageUrl: image,
           actionUrl: `/auction/${auction.id}`,
           dedupKey: `upcoming_${threshold.key}`,
+          title_ar: 'مزاد قادم',
+          message_ar: `مزاد ${auction.name} يبدأ خلال ${threshold.label === '7 days' ? '7 أيام' : threshold.label === '3 days' ? '3 أيام' : threshold.label === '24 hours' ? '24 ساعة' : threshold.label === '1 hour' ? 'ساعة واحدة' : '15 دقيقة'}. سعر البداية: $${Number(auction.starting_price).toLocaleString()}.`
         })
         break // Only send the closest matching threshold
       }
@@ -80,6 +82,8 @@ function checkAuctionStarts() {
         imageUrl: image,
         actionUrl: `/auction/${auction.id}`,
         dedupKey: 'started',
+        title_ar: 'بدأ المزاد',
+        message_ar: `مزاد ${auction.name} مباشر الآن! سعر البداية: $${Number(auction.starting_price).toLocaleString()}. ابدأ المزايدة الآن.`
       })
 
       // Admin notification
@@ -89,6 +93,8 @@ function checkAuctionStarts() {
         message: `${auction.name} auction is now live.`,
         imageUrl: image,
         actionUrl: `/admin`,
+        title_ar: 'بدأ المزاد',
+        message_ar: `مزاد ${auction.name} مباشر الآن.`
       })
     }
   }
@@ -120,6 +126,8 @@ function checkEndingSoon() {
           imageUrl: image,
           actionUrl: `/auction/${auction.id}`,
           dedupKey: `ending_${threshold.key}`,
+          title_ar: 'المزاد ينتهي قريباً',
+          message_ar: `مزاد ${auction.name} ينتهي خلال ${threshold.label === '24 hours' ? '24 ساعة' : threshold.label === '1 hour' ? 'ساعة واحدة' : '15 دقيقة'}. المزايدة الحالية: $${Number(highest).toLocaleString()}.`
         })
         break // Only send the closest matching threshold
       }
@@ -160,6 +168,8 @@ function checkAuctionEnds() {
         imageUrl: image,
         actionUrl: `/auction/${auction.id}`,
         dedupKey: 'won',
+        title_ar: '!مبروك! لقد فزت',
+        message_ar: `لقد فزت بمزاد ${auction.name} بمزايدة نهائية قدرها $${Number(winningBid.amount).toLocaleString()}!`
       })
 
       // Loser notifications (all other participants)
@@ -175,6 +185,8 @@ function checkAuctionEnds() {
           imageUrl: image,
           actionUrl: `/auction/${auction.id}`,
           dedupKey: 'lost',
+          title_ar: 'انتهى المزاد',
+          message_ar: `انتهى مزاد ${auction.name}. للأسف، لم تفز في هذا المزاد. المزايدة الفائزة: $${Number(winningBid.amount).toLocaleString()}.`
         })
       }
 
@@ -186,6 +198,8 @@ function checkAuctionEnds() {
         imageUrl: image,
         actionUrl: `/auction/${auction.id}`,
         dedupKey: 'ended',
+        title_ar: 'انتهى المزاد',
+        message_ar: `انتهى مزاد ${auction.name}. المزايدة الفائزة: $${Number(winningBid.amount).toLocaleString()}.`
       })
     } else {
       // No bids — just notify it ended
@@ -200,6 +214,8 @@ function checkAuctionEnds() {
       imageUrl: image,
       actionUrl: `/admin`,
       dedupKey: 'admin_ended',
+      title_ar: 'انتهى المزاد',
+      message_ar: `انتهى مزاد ${auction.name}.${bids.length > 0 ? ` الفائز: ${bids[0].user_name} ($${Number(bids[0].amount).toLocaleString()})` : ' لا يوجد مزايدات.'}`
     })
   }
 }

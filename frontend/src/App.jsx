@@ -15,6 +15,8 @@ import AuctionsPage from './pages/AuctionsPage'
 import AuctionDetailPage from './pages/AuctionDetailPage'
 import NotificationsPage from './pages/NotificationsPage'
 import { WishlistPage, BrandsPage } from './pages/OtherPages'
+import ProfilePage from './pages/ProfilePage'
+import AuctionCheckoutPage from './pages/AuctionCheckoutPage'
 
 // Scroll to top on route change
 function ScrollToTop() {
@@ -64,7 +66,9 @@ function AppRoutes() {
         <Route path="/checkout" element={<PublicLayout><CheckoutPage /></PublicLayout>} />
         <Route path="/auctions" element={<PublicLayout><AuctionsPage /></PublicLayout>} />
         <Route path="/auction/:id" element={<PublicLayout><AuctionDetailPage /></PublicLayout>} />
+        <Route path="/auction/:id/checkout" element={<PublicLayout><AuctionCheckoutPage /></PublicLayout>} />
         <Route path="/notifications" element={<PublicLayout><NotificationsPage /></PublicLayout>} />
+        <Route path="/profile" element={<PublicLayout><ProfilePage /></PublicLayout>} />
         <Route path="/about" element={<PublicLayout>
           <div style={{ padding:'80px 20px', textAlign:'center', maxWidth:640, margin:'0 auto' }}>
             <div className="section-label">Our Story</div>

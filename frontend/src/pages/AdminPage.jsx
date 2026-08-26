@@ -4,7 +4,8 @@ import {
   LayoutDashboard, Package, ShoppingCart, Users, Tag, Award,
   Plus, Edit2, Trash2, X, Menu, Check, ArrowLeft,
   Upload, RefreshCcw, AlertCircle, ChevronDown, LogOut,
-  TrendingUp, DollarSign, Box, ClipboardList, Image, Gavel, Timer, StopCircle, Trophy, Bell, Megaphone
+  TrendingUp, DollarSign, Box, ClipboardList, Image, Gavel, Timer, StopCircle, Trophy, Bell, Megaphone,
+  MapPin, Search, Phone, Mail, ExternalLink
 } from 'lucide-react'
 import { useStore } from '../context/StoreContext'
 import SlidesManager from "../components/SlidesManager";
@@ -521,6 +522,13 @@ export default function AdminPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [adminNotifs, setAdminNotifs] = useState([])
   const [adminNotifsLoading, setAdminNotifsLoading] = useState(false)
+  const [customers, setCustomers] = useState([])
+  const [customersLoading, setCustomersLoading] = useState(false)
+  const [customerSearch, setCustomerSearch] = useState('')
+  const [customerFilter, setCustomerFilter] = useState('all')
+  const [completedAucts, setCompletedAucts] = useState([])
+  const [completedLoading, setCompletedLoading] = useState(false)
+  const [expandedAuction, setExpandedAuction] = useState(null)
 
   // Auth check
   const [authChecked, setAuthChecked] = useState(false)
@@ -549,6 +557,30 @@ export default function AdminPage() {
     } catch {} finally { setAdminNotifsLoading(false) }
   }
 
+  const loadCustomers = async () => {
+    setCustomersLoading(true)
+    try {
+      const data = await api('/admin/customers')
+      setCustomers(data.data || [])
+    } catch {} finally { setCustomersLoading(false) }
+  }
+
+  const updateCustomerStatus = async (id, status) => {
+    try {
+      await api(`/admin/customers/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) })
+      setCustomers(prev => prev.map(c => c.id === id ? { ...c, status } : c))
+      addToast('Status updated')
+    } catch { addToast('Error', 'error') }
+  }
+
+  const loadCompletedAuctions = async () => {
+    setCompletedLoading(true)
+    try {
+      const data = await api('/admin/completed-auctions')
+      setCompletedAucts(data.data || [])
+    } catch {} finally { setCompletedLoading(false) }
+  }
+
   const markAdminNotifRead = async (id) => {
     try {
       await api(`/admin/notifications/${id}/read`, { method: 'PATCH' })
@@ -568,6 +600,8 @@ export default function AdminPage() {
     if (section === 'orders')    loadOrders()
     if (section === 'auctions')  loadAdminAuctions()
     if (section === 'notifications') loadAdminNotifs()
+    if (section === 'customers') loadCustomers()
+    if (section === 'completed') loadCompletedAuctions()
   }, [section])
 
   const navItems = [
@@ -575,6 +609,8 @@ export default function AdminPage() {
     { id:'slides', icon:Image, label:'Hero Slides' },
     { id:'products',  icon:Package,         label:'Products',   badge:products.length },
     { id:'orders',    icon:ShoppingCart,    label:'Orders',     badge:orders.filter(o=>o.status==='pending').length },
+    { id:'customers', icon:Users, label:t.adminCustomers||'Customers' },
+    { id:'completed', icon:Trophy, label:t.completedAuctions||'Completed Auctions' },
     { id:'brands',    icon:Award,           label:'Brands' },
     { id:'categories',icon:Tag,             label:'Categories' },
     { id:'auctions',  icon:Gavel,           label:t.adminAuctions||'Auctions', badge:auctions.filter(a=>a.status==='live').length },
@@ -923,6 +959,159 @@ export default function AdminPage() {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+          </div>
+        )}
+        {section==='customers' && (
+          <div>
+            <div style={{display:'flex',flexWrap:'wrap',justifyContent:'space-between',alignItems:'center',gap:12,marginBottom:24}}>
+              <h2 style={{fontFamily:'var(--font-display)',fontSize:'1.3rem',fontWeight:300,margin:0}}>{t.customerManagement||'Customer Management'}</h2>
+              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                <div style={{position:'relative'}}>
+                  <Search size={14} style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'var(--text-muted)'}}/>
+                  <input type="text" placeholder={t.searchCustomers||'Search customers...'} value={customerSearch} onChange={e=>setCustomerSearch(e.target.value)}
+                    style={{paddingLeft:32,padding:'8px 12px 8px 32px',background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:'var(--radius)',color:'var(--text-primary)',fontSize:'0.75rem',minWidth:200}}/>
+                </div>
+                <select value={customerFilter} onChange={e=>setCustomerFilter(e.target.value)}
+                  style={{padding:'8px 12px',background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:'var(--radius)',color:'var(--text-primary)',fontSize:'0.75rem'}}>
+                  <option value="all">{t.all||'All'}</option>
+                  <option value="active">{t.active||'Active'}</option>
+                  <option value="suspended">{t.suspended||'Suspended'}</option>
+                  <option value="banned">{t.banned||'Banned'}</option>
+                </select>
+              </div>
+            </div>
+            {customersLoading ? <div style={{textAlign:'center',padding:40,color:'var(--text-muted)'}}>{t.loading||'Loading...'}</div> : (
+              <div style={{overflowX:'auto'}}>
+                <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.75rem'}}>
+                  <thead>
+                    <tr style={{borderBottom:'2px solid var(--border)'}}>
+                      {[t.customerId||'ID',t.customerName||'Name',t.customerEmail||'Email',t.customerPhone||'Phone',t.customerLocation||'Location',t.registrationDate||'Registered',t.totalBids||'Bids',t.totalAuctionsParticipated||'Auctions',t.totalWins||'Wins',t.customerStatus||'Status'].map((h,i)=>(
+                        <th key={i} style={{padding:'10px 8px',textAlign:dir==='rtl'?'right':'left',fontWeight:600,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.08em',fontSize:'0.6rem',whiteSpace:'nowrap'}}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {customers
+                      .filter(c=>c.role!=='admin')
+                      .filter(c=>customerFilter==='all'||c.status===customerFilter)
+                      .filter(c=>!customerSearch||c.name?.toLowerCase().includes(customerSearch.toLowerCase())||c.email?.toLowerCase().includes(customerSearch.toLowerCase())||c.phone?.includes(customerSearch))
+                      .map(c=>(
+                      <tr key={c.id} style={{borderBottom:'1px solid var(--border-subtle)',transition:'background 0.15s'}} onMouseEnter={e=>e.currentTarget.style.background='var(--bg-secondary)'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                        <td style={{padding:'12px 8px',color:'var(--text-muted)'}}>{c.id}</td>
+                        <td style={{padding:'12px 8px',fontWeight:500,color:'var(--text-primary)'}}>{c.name}</td>
+                        <td style={{padding:'12px 8px',color:'var(--text-secondary)'}}>{c.email}</td>
+                        <td style={{padding:'12px 8px',color:'var(--text-secondary)'}}>{c.phone||'—'}</td>
+                        <td style={{padding:'12px 8px',color:'var(--text-secondary)',maxWidth:150,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.location||'—'}</td>
+                        <td style={{padding:'12px 8px',color:'var(--text-muted)',whiteSpace:'nowrap'}}>{c.created_at?new Date(c.created_at).toLocaleDateString():'—'}</td>
+                        <td style={{padding:'12px 8px',textAlign:'center'}}>{c.bidCount}</td>
+                        <td style={{padding:'12px 8px',textAlign:'center'}}>{c.auctionCount}</td>
+                        <td style={{padding:'12px 8px',textAlign:'center'}}>{c.wonCount}</td>
+                        <td style={{padding:'12px 8px'}}>
+                          <select value={c.status||'active'} onChange={e=>updateCustomerStatus(c.id,e.target.value)}
+                            style={{padding:'4px 8px',background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:'var(--radius)',color:c.status==='banned'?'#e04444':c.status==='suspended'?'#f59e0b':'#4cc9a8',fontSize:'0.65rem',fontWeight:600}}>
+                            <option value="active">{t.active||'Active'}</option>
+                            <option value="suspended">{t.suspended||'Suspended'}</option>
+                            <option value="banned">{t.banned||'Banned'}</option>
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {section==='completed' && (
+          <div>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:24}}>
+              <h2 style={{fontFamily:'var(--font-display)',fontSize:'1.3rem',fontWeight:300,margin:0}}>{t.completedAuctions||'Completed Auctions'}</h2>
+              <button className="btn btn-outline" style={{fontSize:'0.65rem',padding:'7px 14px'}} onClick={loadCompletedAuctions}>
+                <RefreshCcw size={12}/> {t.refresh||'Refresh'}
+              </button>
+            </div>
+            {completedLoading ? <div style={{textAlign:'center',padding:40,color:'var(--text-muted)'}}>{t.loading||'Loading...'}</div> : (
+              <div style={{display:'flex',flexDirection:'column',gap:16}}>
+                {completedAucts.length===0 ? (
+                  <div style={{textAlign:'center',padding:60,color:'var(--text-muted)'}}>No completed auctions</div>
+                ) : completedAucts.map(a=>(
+                  <div key={a.id} style={{background:'var(--bg-card)',border:'1px solid var(--border-subtle)',borderRadius:'var(--radius-lg,12px)',overflow:'hidden'}}>
+                    <div style={{display:'flex',gap:16,padding:'16px 20px',cursor:'pointer',alignItems:'center'}} onClick={()=>setExpandedAuction(expandedAuction===a.id?null:a.id)}>
+                      {a.image_url && <img src={a.image_url} alt="" style={{width:50,height:50,objectFit:'cover',borderRadius:'var(--radius)',flexShrink:0}}/>}
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontWeight:500,color:'var(--text-primary)',marginBottom:2}}>{a.name}</div>
+                        <div style={{fontSize:'0.7rem',color:'var(--text-muted)'}}>{a.brand} • {a.totalBids} {t.totalBids||'bids'}</div>
+                      </div>
+                      <div style={{textAlign:'right',flexShrink:0}}>
+                        <div style={{fontWeight:600,color:'var(--gold)',fontSize:'1rem'}}>${Number(a.finalPrice).toLocaleString()}</div>
+                        <div style={{fontSize:'0.65rem',color:a.winner?'#4cc9a8':'var(--text-muted)'}}>{a.winner?(a.winner.profile?.name||a.winner.user_name):(t.noWinner||'No Winner')}</div>
+                      </div>
+                      <ChevronDown size={16} style={{color:'var(--text-muted)',transform:expandedAuction===a.id?'rotate(180deg)':'',transition:'transform 0.2s'}}/>
+                    </div>
+                    {expandedAuction===a.id && (
+                      <div style={{padding:'0 20px 20px',borderTop:'1px solid var(--border-subtle)'}}>
+                        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:16,paddingTop:16}}>
+                          <div>
+                            <Label>{t.auctionStartDate||'Start Date'}</Label>
+                            <div style={{fontSize:'0.8rem',color:'var(--text-primary)'}}>{new Date(a.start_date).toLocaleString()}</div>
+                          </div>
+                          <div>
+                            <Label>{t.auctionEndDate||'End Date'}</Label>
+                            <div style={{fontSize:'0.8rem',color:'var(--text-primary)'}}>{new Date(a.end_date).toLocaleString()}</div>
+                          </div>
+                          <div>
+                            <Label>{t.startingPrice||'Starting Price'}</Label>
+                            <div style={{fontSize:'0.8rem',color:'var(--text-primary)'}}>${Number(a.starting_price).toLocaleString()}</div>
+                          </div>
+                          <div>
+                            <Label>{t.finalPrice||'Final Price'}</Label>
+                            <div style={{fontSize:'0.8rem',color:'var(--gold)',fontWeight:600}}>${Number(a.finalPrice).toLocaleString()}</div>
+                          </div>
+                        </div>
+                        {a.winner && a.winner.profile && (
+                          <div style={{marginTop:20,padding:16,background:'rgba(201,168,76,0.05)',borderRadius:'var(--radius)',border:'1px solid rgba(201,168,76,0.15)'}}>
+                            <Label>{t.winner||'Winner'}</Label>
+                            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:12,marginTop:8}}>
+                              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                                <Users size={14} style={{color:'var(--gold)'}}/>
+                                <span style={{fontSize:'0.8rem',color:'var(--text-primary)'}}>{a.winner.profile.name}</span>
+                              </div>
+                              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                                <Mail size={14} style={{color:'var(--gold)'}}/>
+                                <span style={{fontSize:'0.8rem',color:'var(--text-secondary)'}}>{a.winner.profile.email}</span>
+                              </div>
+                              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                                <Phone size={14} style={{color:'var(--gold)'}}/>
+                                <span style={{fontSize:'0.8rem',color:'var(--text-secondary)'}}>{a.winner.profile.phone||'—'}</span>
+                              </div>
+                              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                                <MapPin size={14} style={{color:'var(--gold)'}}/>
+                                <span style={{fontSize:'0.8rem',color:'var(--text-secondary)'}}>{a.winner.profile.location||'—'}</span>
+                              </div>
+                              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                                <DollarSign size={14} style={{color:'var(--gold)'}}/>
+                                <span style={{fontSize:'0.8rem',fontWeight:600,color:'var(--gold)'}}>${Number(a.winner.amount).toLocaleString()}</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        <div style={{display:'flex',gap:12,marginTop:16,flexWrap:'wrap'}}>
+                          {a.order ? (
+                            <div style={{display:'flex',alignItems:'center',gap:8}}>
+                              <StatusBadge status={a.order.status}/>
+                              <span style={{fontSize:'0.7rem',color:'var(--text-muted)'}}>{a.order.order_number}</span>
+                            </div>
+                          ) : a.winner ? (
+                            <span style={{fontSize:'0.7rem',color:'var(--text-muted)',fontStyle:'italic'}}>{t.pending||'Pending'} — {t.noOrders||'No order yet'}</span>
+                          ) : null}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </div>

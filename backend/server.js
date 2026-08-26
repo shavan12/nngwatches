@@ -98,17 +98,35 @@ app.post('/api/auth/login',(req,res)=>{
   res.json({token,user:{id:user.id,name:user.name,email:user.email,role:user.role}})
 })
 app.post('/api/auth/register',(req,res)=>{
-  const{name,email,password,phone=''}=req.body
-  if(!name||!email||!password) return res.status(400).json({error:'Name, email and password required'})
-  if(db.get('users',{email})) return res.status(409).json({error:'Email already registered'})
-  const user=db.insert('users',{name,email,password:bcrypt.hashSync(password,10),role:'customer',phone})
-  const token=makeToken({id:user.id,role:'customer',name})
-  res.status(201).json({token,user:{id:user.id,name,email,role:'customer'}})
+  const{name,email,password,confirm_password,phone,location}=req.body
+  if(!name||!email||!password) return res.status(400).json({error:'FIELDS_REQUIRED'})
+  if(!phone) return res.status(400).json({error:'PHONE_REQUIRED'})
+  if(!location) return res.status(400).json({error:'LOCATION_REQUIRED'})
+  if(password.length<6) return res.status(400).json({error:'PASSWORD_TOO_SHORT'})
+  if(password!==confirm_password) return res.status(400).json({error:'PASSWORD_MISMATCH'})
+  const emailRegex=/^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if(!emailRegex.test(email)) return res.status(400).json({error:'INVALID_EMAIL'})
+  if(db.get('users',{email})) return res.status(409).json({error:'EMAIL_EXISTS'})
+  const user=db.insert('users',{name,email,password:bcrypt.hashSync(password,10),role:'customer',phone,location:location||''})
+  const token=jwt.sign({id:user.id,role:'customer',name},SECRET,{expiresIn:'7d'})
+  res.status(201).json({token,user:{id:user.id,name,email,role:'customer',phone:user.phone,location:user.location}})
 })
 app.get('/api/auth/me',auth,(req,res)=>{
   const user=db.byId('users',req.user.id)
-  if(!user) return res.status(404).json({error:'Not found'})
-  const{password:_,...safe}=user; res.json(safe)
+  if(!user) return res.status(404).json({error:'User not found'})
+  res.json({id:user.id,name:user.name,email:user.email,role:user.role,phone:user.phone||'',location:user.location||'',created_at:user.created_at})
+})
+app.put('/api/auth/profile',auth,(req,res)=>{
+  const user=db.byId('users',req.user.id)
+  if(!user) return res.status(404).json({error:'User not found'})
+  const{name,phone,location}=req.body
+  const updates={}
+  if(name&&name.trim()) updates.name=name.trim()
+  if(phone!==undefined) updates.phone=phone
+  if(location!==undefined) updates.location=location
+  db.update('users',req.user.id,updates)
+  const updated=db.byId('users',req.user.id)
+  res.json({id:updated.id,name:updated.name,email:updated.email,role:updated.role,phone:updated.phone||'',location:updated.location||'',created_at:updated.created_at})
 })
 
 // ════════ PRODUCTS ════════
@@ -367,6 +385,8 @@ app.post('/api/auctions/:id/bid',auth,(req,res)=>{
       imageUrl: auctionImage,
       actionUrl: `/auction/${a.id}`,
       dedupKey: `outbid_${bid.id}`,
+      title_ar: 'تم المزايدة عليك',
+      message_ar: `تم تجاوز مزايدتك على ${a.name}. المزايدة الحالية: $${bidAmount.toLocaleString()}.`
     })
   }
   // Notify other participants about new bid
@@ -377,6 +397,8 @@ app.post('/api/auctions/:id/bid',auth,(req,res)=>{
     imageUrl: auctionImage,
     actionUrl: `/auction/${a.id}`,
     dedupKey: `bid_${bid.id}`,
+    title_ar: 'مزايدة جديدة',
+    message_ar: `تم وضع مزايدة جديدة بقيمة $${bidAmount.toLocaleString()} على ${a.name}.`
   }, req.user.id)
   // Admin notification
   notificationService.createAdminNotification(notificationService.TYPES.ADMIN_NEW_BID, {
@@ -385,6 +407,8 @@ app.post('/api/auctions/:id/bid',auth,(req,res)=>{
     message: `${req.user.name} bid $${bidAmount.toLocaleString()} on ${a.name}.`,
     imageUrl: auctionImage,
     actionUrl: '/admin',
+    title_ar: 'مزايدة جديدة',
+    message_ar: `قام ${req.user.name} بالمزايدة بقيمة $${bidAmount.toLocaleString()} على ${a.name}.`
   })
 })
 
@@ -414,6 +438,8 @@ app.post('/api/auctions',admin,(req,res)=>{
     imageUrl: aImg,
     actionUrl: `/auction/${auction.id}`,
     dedupKey: 'new',
+    title_ar: 'مزاد جديد',
+    message_ar: `${auction.name} متاح الآن للمزايدة. سعر البداية: $${Number(auction.starting_price).toLocaleString()}.`
   })
 })
 
@@ -479,6 +505,8 @@ app.post('/api/auctions/:id/end',admin,(req,res)=>{
       auctionId: id, title: 'Congratulations! You Won!',
       message: `You won the ${endedAuction.name} auction with a final bid of $${Number(winner.amount).toLocaleString()}!`,
       imageUrl: endedImage, actionUrl: `/auction/${id}`, dedupKey: 'won',
+      title_ar: '!مبروك! لقد فزت',
+      message_ar: `لقد فزت بمزاد ${endedAuction.name} بمزايدة نهائية قدرها $${Number(winner.amount).toLocaleString()}!`
     })
     const participantIds = [...new Set(bids.map(b=>b.user_id))]
     for(const uid of participantIds){
@@ -487,6 +515,8 @@ app.post('/api/auctions/:id/end',admin,(req,res)=>{
         auctionId: id, title: 'Auction Ended',
         message: `The ${endedAuction.name} auction has ended. Unfortunately, you were not the winning bidder.`,
         imageUrl: endedImage, actionUrl: `/auction/${id}`, dedupKey: 'lost',
+        title_ar: 'انتهى المزاد',
+        message_ar: `انتهى مزاد ${endedAuction.name}. للأسف، لم تفز في هذا المزاد.`
       })
     }
   }
@@ -494,6 +524,8 @@ app.post('/api/auctions/:id/end',admin,(req,res)=>{
     auctionId: id, title: 'Auction Manually Ended',
     message: `${endedAuction.name} was manually ended.${bids.length>0?` Winner: ${bids[0].user_name} ($${Number(bids[0].amount).toLocaleString()})`:'No bids.'}`,
     imageUrl: endedImage, actionUrl: '/admin', dedupKey: 'admin_ended_manual',
+    title_ar: 'تم إنهاء المزاد يدوياً',
+    message_ar: `تم إنهاء ${endedAuction.name} يدوياً.${bids.length>0?` الفائز: ${bids[0].user_name} ($${Number(bids[0].amount).toLocaleString()})`:'لا يوجد مزايدات.'}`
   })
   res.json(fullAuction(db.byId('auctions',id)))
 })
@@ -580,6 +612,8 @@ app.post('/api/admin/auctions/:id/announce',admin,(req,res)=>{
     imageUrl:img,
     actionUrl:`/auction/${a.id}`,
     dedupKey:'announce_'+Date.now(),
+    title_ar: 'إعلان مزاد',
+    message_ar: `${a.name} متاح للمزايدة. سعر البداية: $${Number(a.starting_price).toLocaleString()}.`
   })
   res.json({message:'Auction re-announced to all users'})
 })
@@ -612,6 +646,110 @@ app.post('/api/notifications/push/unsubscribe',auth,(req,res)=>{
   if(!endpoint) return res.status(400).json({error:'Endpoint required'})
   pushService.removeSubscription(req.user.id,endpoint)
   res.json({message:'Push subscription removed'})
+})
+
+// ── Admin: Customer Management ──
+app.get('/api/admin/customers',admin,(req,res)=>{
+  const users=db.all('users').map(u=>{
+    const orderCount=db.count('orders',{customer_email:u.email})
+    const bidCount=db.count('bids',{user_id:u.id})
+    const auctionIds=[...new Set(db.all('bids',{user_id:u.id}).map(b=>b.auction_id))]
+    const wonCount=db.count('auction_winners',{user_id:u.id})
+    return{
+      id:u.id,name:u.name,email:u.email,phone:u.phone||'',location:u.location||'',
+      role:u.role,created_at:u.created_at,status:u.status||'active',
+      orderCount,bidCount,auctionCount:auctionIds.length,wonCount
+    }
+  })
+  res.json({data:users})
+})
+
+app.get('/api/admin/customers/:id',admin,(req,res)=>{
+  const u=db.byId('users',Number(req.params.id))
+  if(!u) return res.status(404).json({error:'Customer not found'})
+  const bids=db.all('bids',{user_id:u.id})
+  const orders=db.all('orders',{customer_email:u.email})
+  const wins=db.all('auction_winners',{user_id:u.id})
+  res.json({
+    id:u.id,name:u.name,email:u.email,phone:u.phone||'',location:u.location||'',
+    role:u.role,created_at:u.created_at,status:u.status||'active',
+    bids,orders,wins
+  })
+})
+
+app.put('/api/admin/customers/:id/status',admin,(req,res)=>{
+  const u=db.byId('users',Number(req.params.id))
+  if(!u) return res.status(404).json({error:'Customer not found'})
+  const{status}=req.body
+  if(!['active','suspended','banned'].includes(status)) return res.status(400).json({error:'Invalid status'})
+  db.update('users',u.id,{status})
+  res.json({message:'Status updated'})
+})
+
+// ── Admin: Completed Auctions ──
+app.get('/api/admin/completed-auctions',admin,(req,res)=>{
+  const allAuctions=db.all('auctions')
+  const completed=allAuctions.filter(a=>{
+    if(a.manually_ended) return true
+    const now=new Date()
+    return new Date(a.end_date)<now
+  }).map(a=>{
+    const winner=db.get('auction_winners',{auction_id:a.id})
+    let winnerProfile=null
+    if(winner){
+      const u=db.byId('users',winner.user_id)
+      if(u) winnerProfile={id:u.id,name:u.name,email:u.email,phone:u.phone||'',location:u.location||''}
+    }
+    const bids=db.all('bids',{auction_id:a.id})
+    const images=db.all('auction_images',{auction_id:a.id}).sort((x,y)=>x.sort_order-y.sort_order)
+    const linkedOrder=winner?db.get('orders',{auction_id:a.id}):null
+    return{
+      id:a.id,name:a.name,brand:a.brand||'',image_url:images.length>0?images[0].url:(a.image_url||''),
+      starting_price:a.starting_price,start_date:a.start_date,end_date:a.end_date,
+      totalBids:bids.length,
+      finalPrice:winner?winner.amount:(bids.length>0?Math.max(...bids.map(b=>b.amount)):a.starting_price),
+      winner:winner?{...winner,profile:winnerProfile}:null,
+      order:linkedOrder?{id:linkedOrder.id,order_number:linkedOrder.order_number,status:linkedOrder.status,payment_status:linkedOrder.payment_status||'pending'}:null
+    }
+  }).sort((a,b)=>new Date(b.end_date)-new Date(a.end_date))
+  res.json({data:completed})
+})
+
+// ── Auction Winner Order ──
+app.post('/api/auctions/:id/winner-order',auth,(req,res)=>{
+  const auctionId=Number(req.params.id)
+  const auction=db.byId('auctions',auctionId)
+  if(!auction) return res.status(404).json({error:'Auction not found'})
+  const winner=db.get('auction_winners',{auction_id:auctionId})
+  if(!winner) return res.status(400).json({error:'No winner for this auction'})
+  if(winner.user_id!==req.user.id) return res.status(403).json({error:'Only the auction winner can create this order'})
+  // Check for existing order
+  const existingOrder=db.get('orders',{auction_id:auctionId})
+  if(existingOrder) return res.status(409).json({error:'ORDER_EXISTS',order_number:existingOrder.order_number})
+  const{shipping_address,city,country,notes}=req.body
+  if(!shipping_address||!city||!country) return res.status(400).json({error:'Shipping address, city and country are required'})
+  const user=db.byId('users',req.user.id)
+  const orderNumber='ORD-'+new Date().getFullYear()+'-'+String(Math.floor(100000+Math.random()*900000))
+  const order=db.insert('orders',{
+    order_number:orderNumber,
+    customer_name:user.name,customer_email:user.email,customer_phone:user.phone||'',
+    shipping_address,city,country,notes:notes||'',
+    subtotal:winner.amount,shipping:0,total:winner.amount,
+    status:'pending',payment_status:'pending',
+    auction_id:auctionId,
+    is_auction_order:1
+  })
+  // Add auction item as order item
+  const images=db.all('auction_images',{auction_id:auctionId}).sort((x,y)=>x.sort_order-y.sort_order)
+  db.insert('order_items',{
+    order_id:order.id,
+    product_name:auction.name,
+    product_brand:auction.brand||'',
+    product_image:images.length>0?images[0].url:(auction.image_url||''),
+    price:winner.amount,
+    quantity:1
+  })
+  res.status(201).json({order_number:orderNumber,total:winner.amount})
 })
 
 // ── Extend stats with auction data ──

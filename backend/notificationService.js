@@ -78,7 +78,7 @@ function isEnabled(userId, type) {
 }
 
 // Create a single notification for one user
-function create(userId, type, { auctionId = null, title, message, imageUrl = '', actionUrl = '', dedupKey = '' } = {}) {
+function create(userId, type, { auctionId = null, title, message, imageUrl = '', actionUrl = '', dedupKey = '', title_ar = '', message_ar = '' } = {}) {
   if (!userId || !type || !title) return null
   // Check preferences
   if (!isEnabled(userId, type)) return null
@@ -91,6 +91,8 @@ function create(userId, type, { auctionId = null, title, message, imageUrl = '',
     auction_id: auctionId || 0,
     title,
     message: message || '',
+    title_ar: title_ar || '',
+    message_ar: message_ar || '',
     image_url: imageUrl || '',
     action_url: actionUrl || '',
     is_read: 0,
@@ -147,7 +149,7 @@ function createForParticipants(auctionId, type, data, excludeUserId = null) {
 }
 
 // Create admin-only notification
-function createAdminNotification(type, { auctionId = null, title, message, imageUrl = '', actionUrl = '' } = {}) {
+function createAdminNotification(type, { auctionId = null, title, message, imageUrl = '', actionUrl = '', title_ar = '', message_ar = '' } = {}) {
   const admins = db.all('users').filter(u => u.role === 'admin')
   const results = []
   for (const a of admins) {
@@ -157,6 +159,8 @@ function createAdminNotification(type, { auctionId = null, title, message, image
       auction_id: auctionId || 0,
       title,
       message: message || '',
+      title_ar: title_ar || '',
+      message_ar: message_ar || '',
       image_url: imageUrl || '',
       action_url: actionUrl || '',
       is_read: 0,

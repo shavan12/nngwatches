@@ -31,18 +31,18 @@ function timeAgo(dateStr) {
   return date.toLocaleDateString()
 }
 
-const PREF_LABELS = [
-  { key: 'new_auctions',      label: 'New Auctions',         desc: 'When a new auction is created' },
-  { key: 'upcoming_auctions', label: 'Upcoming Auctions',    desc: 'Reminders before auction starts' },
-  { key: 'auction_started',   label: 'Auction Started',      desc: 'When an auction goes live' },
-  { key: 'new_bids',          label: 'New Bids',             desc: 'When someone bids on your auction' },
-  { key: 'outbid',            label: 'Outbid Alerts',        desc: 'When someone outbids you', mandatory: true },
-  { key: 'auction_ending',    label: 'Auction Ending',       desc: 'Reminders before auction ends' },
-  { key: 'auction_results',   label: 'Auction Results',      desc: 'Win/loss notifications', mandatory: true },
+const getPrefLabels = (t) => [
+  { key: 'new_auctions',      label: t.newAuctions || 'New Auctions',         desc: t.newAuctionsDesc || 'When a new auction is created' },
+  { key: 'upcoming_auctions', label: t.upcomingAuctions || 'Upcoming Auctions',    desc: t.upcomingAuctionsDesc || 'Reminders before auction starts' },
+  { key: 'auction_started',   label: t.auctionStarted || 'Auction Started',      desc: t.auctionStartedDesc || 'When an auction goes live' },
+  { key: 'new_bids',          label: t.newBids || 'New Bids',             desc: t.newBidsDesc || 'When someone bids on your auction' },
+  { key: 'outbid',            label: t.outbidAlerts || 'Outbid Alerts',        desc: t.outbidAlertsDesc || 'When someone outbids you', mandatory: true },
+  { key: 'auction_ending',    label: t.auctionEnding || 'Auction Ending',       desc: t.auctionEndingDesc || 'Reminders before auction ends' },
+  { key: 'auction_results',   label: t.auctionResults || 'Auction Results',      desc: t.auctionResultsDesc || 'Win/loss notifications', mandatory: true },
 ]
 
 export default function NotificationsPage() {
-  const { notifications, unreadCount, fetchNotifications, markNotificationRead, markAllNotificationsRead, deleteNotification, user, addToast, api, pushEnabled, subscribeToPush, unsubscribeFromPush } = useStore()
+  const { t, lang, dir, notifications, unreadCount, fetchNotifications, markNotificationRead, markAllNotificationsRead, deleteNotification, user, addToast, api, pushEnabled, subscribeToPush, unsubscribeFromPush } = useStore()
   const [activeTab, setActiveTab] = useState('all')
   const [showPrefs, setShowPrefs] = useState(false)
   const [prefs, setPrefs] = useState(null)
@@ -91,9 +91,9 @@ export default function NotificationsPage() {
         method: 'PUT',
         body: JSON.stringify(updated),
       })
-      addToast('Preferences saved')
+      addToast(t.profileUpdated || 'Preferences saved')
     } catch {
-      addToast('Failed to save', 'error')
+      addToast(t.error || 'Failed to save', 'error')
     }
   }
 
@@ -109,38 +109,38 @@ export default function NotificationsPage() {
   const handleDelete = async (e, id) => {
     e.stopPropagation()
     await deleteNotification(id)
-    addToast('Notification deleted')
+    addToast(t.deleted || 'Notification deleted')
   }
 
   if (!user) {
     return (
-      <div style={{ padding: '120px 20px', textAlign: 'center' }}>
+      <div dir={dir} style={{ padding: '120px 20px', textAlign: 'center' }}>
         <Bell size={48} strokeWidth={1} style={{ color: 'var(--text-muted)', marginBottom: 16 }} />
-        <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 300, marginBottom: 8 }}>Sign in to view notifications</h2>
+        <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 300, marginBottom: 8 }}>{t.signIn || 'Sign in to view notifications'}</h2>
         <p style={{ color: 'var(--text-secondary)' }}>You need an account to receive auction notifications.</p>
       </div>
     )
   }
 
   const tabs = [
-    { key: 'all', label: 'All' },
-    { key: 'auctions', label: 'Auctions' },
-    { key: 'bids', label: 'Bids' },
-    { key: 'results', label: 'Results' },
+    { key: 'all', label: t.all || 'All' },
+    { key: 'auctions', label: t.auctions || 'Auctions' },
+    { key: 'bids', label: t.bids || 'Bids' },
+    { key: 'results', label: t.results || 'Results' },
   ]
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: 'clamp(16px, 4vw, 40px) clamp(12px, 3vw, 20px) 80px' }}>
+    <div dir={dir} style={{ maxWidth: 720, margin: '0 auto', padding: 'clamp(16px, 4vw, 40px) clamp(12px, 3vw, 20px) 80px' }}>
       {/* Header */}
       <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 24 }}>
         <div>
-          <div className="section-label">Notification Center</div>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.3rem, 5vw, 2rem)', fontWeight: 300, margin: 0 }}>Notifications</h1>
+          <div className="section-label">{t.notificationCenter || 'Notification Center'}</div>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.3rem, 5vw, 2rem)', fontWeight: 300, margin: 0 }}>{t.notifications || 'Notifications'}</h1>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {unreadCount > 0 && (
             <button className="btn btn-outline" style={{ fontSize: '0.65rem', padding: '7px 12px' }} onClick={markAllNotificationsRead}>
-              <CheckCheck size={14} /> Mark All Read
+              <CheckCheck size={14} /> {t.markAllRead || 'Mark All Read'}
             </button>
           )}
           <button
@@ -148,7 +148,7 @@ export default function NotificationsPage() {
             style={{ fontSize: '0.65rem', padding: '7px 12px' }}
             onClick={() => setShowPrefs(v => !v)}
           >
-            <Settings size={14} /> Settings
+            <Settings size={14} /> {t.settings || 'Settings'}
           </button>
         </div>
       </div>
@@ -156,14 +156,14 @@ export default function NotificationsPage() {
       {/* Preferences panel */}
       {showPrefs && (
         <div className="notif-prefs-panel" style={{ marginBottom: 32 }}>
-          <h3 style={{ fontSize: '0.8rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--gold)', marginBottom: 16 }}>Notification Preferences</h3>
+          <h3 style={{ fontSize: '0.8rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--gold)', marginBottom: 16 }}>{t.notifPreferences || 'Notification Preferences'}</h3>
           
           {/* Push Notifications toggle */}
           {'Notification' in window && (
             <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid var(--border)' }}>
               <div className="notif-pref-row" style={{ paddingTop: 0 }}>
                 <div>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>📱 Device Notifications</div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>📱 {t.deviceNotifications || 'Device Notifications'}</div>
                   <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>
                     {pushEnabled 
                       ? 'You will receive notifications even when the website is closed' 
@@ -182,8 +182,8 @@ export default function NotificationsPage() {
             </div>
           )}
 
-          <div style={{ fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>Categories</div>
-          {PREF_LABELS.map(({ key, label, desc, mandatory }) => (
+          <div style={{ fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>{t.notifCategories || 'Categories'}</div>
+          {getPrefLabels(t).map(({ key, label, desc, mandatory }) => (
             <div key={key} className="notif-pref-row">
               <div>
                 <div style={{ fontSize: '0.82rem', fontWeight: 500, color: 'var(--text-primary)' }}>{label}</div>
@@ -224,8 +224,8 @@ export default function NotificationsPage() {
         {(notifications || []).length === 0 ? (
           <div className="notif-empty-page">
             <Bell size={48} strokeWidth={1} style={{ color: 'var(--text-muted)', marginBottom: 12 }} />
-            <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 300, margin: '0 0 4px' }}>No notifications</h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>You're all caught up!</p>
+            <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 300, margin: '0 0 4px' }}>{t.noNotifications || 'No notifications'}</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{t.allCaughtUp || "You're all caught up!"}</p>
           </div>
         ) : (
           (notifications || []).map(notif => {
@@ -246,9 +246,9 @@ export default function NotificationsPage() {
                   <Icon size={18} />
                 </div>
                 <div className="notif-page-item-body">
-                  <div className="notif-page-item-type" style={{ color: config.color }}>{config.label}</div>
-                  <div className="notif-page-item-title">{notif.title}</div>
-                  <div className="notif-page-item-message">{notif.message}</div>
+                  <div className="notif-page-item-type" style={{ color: config.color }}>{t[notif.type] || config.label}</div>
+                  <div className="notif-page-item-title">{lang === 'ar' && notif.title_ar ? notif.title_ar : notif.title}</div>
+                  <div className="notif-page-item-message">{lang === 'ar' && notif.message_ar ? notif.message_ar : notif.message}</div>
                   <div className="notif-page-item-time">{timeAgo(notif.created_at)}</div>
                 </div>
                 <div className="notif-page-item-actions">
@@ -283,7 +283,7 @@ export default function NotificationsPage() {
             onClick={loadMore}
             disabled={loadingMore}
           >
-            {loadingMore ? 'Loading...' : 'Load More'}
+            {loadingMore ? t.loading || 'Loading...' : t.loadMore || 'Load More'}
           </button>
         )}
       </div>

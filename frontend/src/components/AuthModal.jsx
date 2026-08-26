@@ -7,27 +7,56 @@ export default function AuthModal() {
   const [mode, setMode]       = useState('login') // 'login' | 'register'
   const [loading, setLoading] = useState(false)
   const [showPw, setShowPw]   = useState(false)
-  const [form, setForm]       = useState({ name:'', email:'', password:'', phone:'' })
+  const [showConfirmPw, setShowConfirmPw] = useState(false)
+  const [form, setForm]       = useState({ name:'', email:'', password:'', confirmPassword:'', phone:'', location:'' })
   const [error, setError]     = useState('')
 
   if (!authOpen) return null
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
+  const ERROR_MAP = {
+    'FIELDS_REQUIRED': t.errFieldsRequired,
+    'PHONE_REQUIRED': t.errPhoneRequired,
+    'LOCATION_REQUIRED': t.errLocationRequired,
+    'PASSWORD_TOO_SHORT': t.errPasswordShort,
+    'PASSWORD_MISMATCH': t.errPasswordMismatch,
+    'INVALID_EMAIL': t.errInvalidEmail,
+    'EMAIL_EXISTS': t.errEmailExists,
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+    
+    if (mode === 'register') {
+      if (!form.phone) {
+        setError(ERROR_MAP['PHONE_REQUIRED'] || 'Phone is required')
+        return
+      }
+      if (!form.location) {
+        setError(ERROR_MAP['LOCATION_REQUIRED'] || 'Location is required')
+        return
+      }
+      if (form.password !== form.confirmPassword) {
+        setError(ERROR_MAP['PASSWORD_MISMATCH'] || 'Passwords do not match')
+        return
+      }
+    }
+
     setLoading(true)
     try {
       if (mode === 'login') {
         const user = await login(form.email, form.password)
-        addToast(`Welcome back, ${user.name}!`)
+        addToast(t.welcomeBack ? t.welcomeBack.replace('{name}', user.name) : `Welcome back, ${user.name}!`)
       } else {
-        const user = await register(form.name, form.email, form.password, form.phone)
-        addToast(`Account created! Welcome, ${user.name}!`)
+        const user = await register(form.name, form.email, form.password, form.phone, form.confirmPassword, form.location)
+        addToast(t.accountCreated ? t.accountCreated.replace('{name}', user.name) : `Account created! Welcome, ${user.name}!`)
       }
       setAuthOpen(false)
     } catch (err) {
-      setError(err.message)
+      // Assuming backend might throw structured errors or simple messages
+      const mappedError = ERROR_MAP[err.message] || ERROR_MAP[err.code] || err.message
+      setError(mappedError)
     } finally {
       setLoading(false)
     }
@@ -60,15 +89,21 @@ export default function AuthModal() {
           )}
 
           <div>
-            <label style={{ display:'block', fontSize:'0.65rem', fontWeight:600, letterSpacing:'0.1em', textTransform:'uppercase', color:'var(--text-muted)', marginBottom:6 }}>{t.loginEmail}</label>
+            <label style={{ display:'block', fontSize:'0.65rem', fontWeight:600, letterSpacing:'0.1em', textTransform:'uppercase', color:'var(--text-muted)', marginBottom:6 }}>{t.email || t.loginEmail}</label>
             <input className="input" type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="you@example.com" required />
           </div>
 
           {mode === 'register' && (
-            <div>
-              <label style={{ display:'block', fontSize:'0.65rem', fontWeight:600, letterSpacing:'0.1em', textTransform:'uppercase', color:'var(--text-muted)', marginBottom:6 }}>{t.phone}</label>
-              <input className="input" type="tel" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="+971 50 123 4567" />
-            </div>
+            <>
+              <div>
+                <label style={{ display:'block', fontSize:'0.65rem', fontWeight:600, letterSpacing:'0.1em', textTransform:'uppercase', color:'var(--text-muted)', marginBottom:6 }}>{t.registerPhone || t.phone}</label>
+                <input className="input" type="tel" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder={t.phonePlaceholder || "+971 50 123 4567"} required />
+              </div>
+              <div>
+                <label style={{ display:'block', fontSize:'0.65rem', fontWeight:600, letterSpacing:'0.1em', textTransform:'uppercase', color:'var(--text-muted)', marginBottom:6 }}>{t.location}</label>
+                <input className="input" type="text" value={form.location} onChange={e => set('location', e.target.value)} placeholder={t.locationPlaceholder || "Dubai, UAE"} required />
+              </div>
+            </>
           )}
 
           <div>
@@ -83,6 +118,21 @@ export default function AuthModal() {
               </button>
             </div>
           </div>
+
+          {mode === 'register' && (
+            <div>
+              <label style={{ display:'block', fontSize:'0.65rem', fontWeight:600, letterSpacing:'0.1em', textTransform:'uppercase', color:'var(--text-muted)', marginBottom:6 }}>{t.confirmPassword}</label>
+              <div style={{ position:'relative' }}>
+                <input className="input" type={showConfirmPw ? 'text' : 'password'} value={form.confirmPassword} onChange={e => set('confirmPassword', e.target.value)}
+                  placeholder="••••••••" required minLength={6}
+                  style={{ paddingRight: 44 }}
+                />
+                <button type="button" className="btn-ghost" style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', padding:4, color:'var(--text-muted)' }} onClick={() => setShowConfirmPw(!showConfirmPw)}>
+                  {showConfirmPw ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+            </div>
+          )}
 
           {error && (
             <div style={{ padding:'10px 14px', background:'rgba(224,68,68,0.08)', border:'1px solid rgba(224,68,68,0.25)', borderRadius:'var(--radius-sm)', fontSize:'0.78rem', color:'#e04444' }}>

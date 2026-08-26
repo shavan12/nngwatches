@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Timer, Users, Gavel, Trophy, TrendingUp, Clock, AlertCircle, Loader } from 'lucide-react'
+import { ArrowLeft, Timer, Users, Gavel, Trophy, TrendingUp, Clock, AlertCircle, Loader, ShoppingCart } from 'lucide-react'
 import { useStore } from '../context/StoreContext'
 
 // ── Inject auction-specific CSS once ─────────────────────
@@ -627,6 +627,16 @@ export default function AuctionDetailPage() {
             <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
               {t.congratsWinner || 'Congratulations to the winner!'}
             </p>
+            {user && auction.winner.user_id === user.id && (
+              <button
+                className="btn btn-gold"
+                style={{ marginTop: 16, padding: '12px 28px', fontSize: '0.82rem', fontWeight: 600 }}
+                onClick={() => navigate(`/auction/${auction.id}/checkout`)}
+              >
+                <ShoppingCart size={16} style={{ marginRight: dir === 'rtl' ? 0 : 6, marginLeft: dir === 'rtl' ? 6 : 0 }} />
+                {t.proceedToCheckout || 'Proceed to Checkout'}
+              </button>
+            )}
           </div>
         )}
       </div>

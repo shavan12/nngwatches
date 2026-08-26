@@ -68,8 +68,14 @@ export default function Header() {
 
                   {userMenuOpen && (
                     <div style={{ position: 'absolute', top: 'calc(100% + 8px)', [dir === 'rtl' ? 'left' : 'right']: 0, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', minWidth: 160, overflow: 'hidden', boxShadow: 'var(--shadow-card)', animation: 'slideDown 0.2s ease', zIndex: 800 }}>
+                      <button onClick={() => { navigate('/profile'); setUserMenuOpen(false) }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 16px', fontSize: '0.75rem', color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-elevated)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                        <User size={13} /> {t.myProfile || 'My Profile'}
+                      </button>
                       {isAdmin && (
-                        <button onClick={() => navigate('/admin')}
+                        <button onClick={() => { navigate('/admin'); setUserMenuOpen(false) }}
                           style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 16px', fontSize: '0.75rem', color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
                           onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-elevated)'}
                           onMouseLeave={e => e.currentTarget.style.background = 'none'}>

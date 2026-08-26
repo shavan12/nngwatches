@@ -32,7 +32,7 @@ function timeAgo(dateStr) {
 }
 
 export default function NotificationBell() {
-  const { notifications, unreadCount, fetchNotifications, markNotificationRead, markAllNotificationsRead, user, dir } = useStore()
+  const { t, lang, notifications, unreadCount, fetchNotifications, markNotificationRead, markAllNotificationsRead, user, dir } = useStore()
   const [open, setOpen] = useState(false)
   const [mobileDrawer, setMobileDrawer] = useState(false)
   const dropdownRef = useRef(null)
@@ -102,8 +102,8 @@ export default function NotificationBell() {
           <Icon size={16} />
         </div>
         <div className="notif-item-body">
-          <div className="notif-item-title">{notif.title}</div>
-          <div className="notif-item-message">{notif.message}</div>
+          <div className="notif-item-title">{lang === 'ar' && notif.title_ar ? notif.title_ar : notif.title}</div>
+          <div className="notif-item-message">{lang === 'ar' && notif.message_ar ? notif.message_ar : notif.message}</div>
           <div className="notif-item-time">{timeAgo(notif.created_at)}</div>
         </div>
         {!notif.is_read && <div className="notif-unread-dot" />}
@@ -114,10 +114,10 @@ export default function NotificationBell() {
   const dropdownContent = (
     <>
       <div className="notif-dropdown-header">
-        <span className="notif-dropdown-title">Notifications</span>
+        <span className="notif-dropdown-title">{t.notifications}</span>
         {unreadCount > 0 && (
           <button className="notif-mark-all" onClick={handleMarkAllRead}>
-            <CheckCheck size={14} /> Mark all read
+            <CheckCheck size={14} /> {t.markAllRead}
           </button>
         )}
       </div>
@@ -126,7 +126,7 @@ export default function NotificationBell() {
         {recentNotifs.length === 0 ? (
           <div className="notif-empty">
             <Bell size={32} strokeWidth={1} style={{ color: 'var(--text-muted)', marginBottom: 8 }} />
-            <span>No notifications yet</span>
+            <span>{t.noNotifications}</span>
           </div>
         ) : (
           recentNotifs.map(renderNotifItem)
@@ -137,7 +137,7 @@ export default function NotificationBell() {
         className="notif-dropdown-footer"
         onClick={() => { setOpen(false); setMobileDrawer(false); navigate('/notifications') }}
       >
-        View All Notifications <ChevronRight size={14} />
+        {t.viewAllNotifications} <ChevronRight size={14} />
       </button>
     </>
   )
@@ -149,7 +149,7 @@ export default function NotificationBell() {
         className="btn-ghost notif-bell-btn"
         style={{ padding: 8, borderRadius: '50%', position: 'relative' }}
         onClick={handleOpen}
-        aria-label="Notifications"
+        aria-label={t.notifications}
       >
         <Bell size={18} />
         {unreadCount > 0 && (
@@ -172,7 +172,7 @@ export default function NotificationBell() {
           <div className="notif-mobile-overlay" onClick={() => setMobileDrawer(false)} />
           <div className="notif-mobile-drawer">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
-              <span style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>Notifications</span>
+              <span style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>{t.notifications}</span>
               <button className="btn-ghost" style={{ padding: 4 }} onClick={() => setMobileDrawer(false)}>
                 <X size={20} />
               </button>
