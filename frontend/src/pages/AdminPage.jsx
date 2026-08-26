@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Package, ShoppingCart, Users, Tag, Award,
-  Plus, Edit2, Trash2, X, Menu, Check, ArrowLeft,
+  Plus, Edit2, Trash2, X, Menu, Check, CheckCheck, ArrowLeft,
   Upload, RefreshCcw, AlertCircle, ChevronDown, LogOut,
   TrendingUp, DollarSign, Box, ClipboardList, Image, Gavel, Timer, StopCircle, Trophy, Bell, Megaphone,
   MapPin, Search, Phone, Mail, ExternalLink
