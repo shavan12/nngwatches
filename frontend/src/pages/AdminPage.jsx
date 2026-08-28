@@ -656,7 +656,7 @@ export default function AdminPage() {
     createProduct, updateProduct, deleteProduct,
     orders, loadOrders, updateOrderStatus,
     stats, loadStats, addBrand, deleteBrand, addCategory, deleteCategory, uploadImage,
-    auctions, auctionsLoading, loadAdminAuctions, createAuction, updateAuction, deleteAuction, endAuction, highlightHighestBid,
+    auctions, auctionsLoading, loadAdminAuctions, createAuction, updateAuction, deleteAuction, endAuction, toggleAutoHighlight, highlightHighestBid,
     api, addToast
   } = useStore()
 
@@ -1077,7 +1077,19 @@ export default function AdminPage() {
                         </div>
                         <div style={{fontSize:'0.65rem',color:'var(--text-muted)'}}>
                           {a.brand} · {t.highestBid||'Highest Bid'}: <span style={{color:'var(--gold)',fontWeight:600}}>${Number(a.current_highest_bid||a.starting_price).toLocaleString()}</span> · {a.bid_count||0} {t.bidders||'bids'} · {a.bidder_count||0} {t.bidders||'bidders'}
-                          {a.highlighted_bid_id && (
+                          {a.auto_highlight_enabled ? (
+                            <span style={{
+                              marginInlineStart: 8, padding: '1px 7px',
+                              background: 'rgba(76,201,168,0.15)',
+                              border: '1px solid rgba(76,201,168,0.4)',
+                              borderRadius: 3,
+                              fontSize: '0.55rem', fontWeight: 700,
+                              color: '#4cc9a8',
+                              display: 'inline-flex', alignItems: 'center', gap: 3
+                            }}>
+                              <Check size={9} strokeWidth={2.5}/> {t.autoHighlightBadge || 'AUTO HIGHLIGHT'}
+                            </span>
+                          ) : (a.highlighted_bid_id && (
                             <span style={{
                               marginInlineStart: 8, padding: '1px 6px',
                               background: 'rgba(76,201,168,0.12)',
@@ -1087,9 +1099,9 @@ export default function AdminPage() {
                               color: '#4cc9a8',
                               display: 'inline-flex', alignItems: 'center', gap: 3
                             }}>
-                              <Check size={9} strokeWidth={2.5}/> {t.adminHighlight || 'ADMIN HIGHLIGHT'}: ${Number(a.highlighted_bid_amount || 0).toLocaleString()}
+                              <Check size={9} strokeWidth={2.5}/> {t.adminHighlight || 'HIGHLIGHTED'}: ${Number(a.highlighted_bid_amount || 0).toLocaleString()}
                             </span>
-                          )}
+                          ))}
                         </div>
                         {a.winner && (
                           <div style={{fontSize:'0.62rem',color:'var(--gold)',marginTop:3}}>
@@ -1099,21 +1111,16 @@ export default function AdminPage() {
                       </div>
                       {/* Actions */}
                       <div style={{display:'flex',gap:6,flexShrink:0}}>
-                        {/* 4th Action: Highlight Highest Bid (GREEN) */}
+                        {/* 4th Action: Auto Highlight Highest Bid Toggle (GREEN) */}
                         <button
-                          onClick={() => {
-                            if (!a.bid_count || a.bid_count === 0) {
-                              addToast(t.noBidsToHighlight || 'No bids available to highlight.', 'error')
-                            } else {
-                              setHighlightConfirm(a)
-                            }
-                          }}
-                          title={t.markHighestBid || 'Mark Current Highest Bid'}
+                          onClick={() => toggleAutoHighlight(a.id)}
+                          title={a.auto_highlight_enabled ? (t.disableAutoHighlight || 'Disable Auto Highlight') : (t.enableAutoHighlight || 'Enable Auto Highlight')}
                           style={{
                             width: 34, height: 34, borderRadius: 'var(--radius-sm)',
-                            border: a.highlighted_bid_id ? '1px solid rgba(76,201,168,0.55)' : '1px solid rgba(76,201,168,0.3)',
-                            background: a.highlighted_bid_id ? 'rgba(76,201,168,0.18)' : 'rgba(76,201,168,0.06)',
-                            color: '#4cc9a8',
+                            border: a.auto_highlight_enabled ? '1px solid #4cc9a8' : '1px solid var(--border-subtle)',
+                            background: a.auto_highlight_enabled ? 'rgba(76,201,168,0.22)' : 'var(--bg-elevated)',
+                            color: a.auto_highlight_enabled ? '#4cc9a8' : 'var(--text-muted)',
+                            boxShadow: a.auto_highlight_enabled ? '0 0 10px rgba(76,201,168,0.35)' : 'none',
                             cursor: 'pointer',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             transition: 'all 0.15s ease'

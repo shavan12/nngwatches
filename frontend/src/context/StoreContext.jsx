@@ -282,17 +282,22 @@ export const translations = {
     noBids: "No Bids",
     orderStatus: "Order Status",
     paymentStatus: "Payment Status",
-    createWinnerOrder: "Create Order",
-    // Admin - Highlight Bid Action
-    markHighestBid: "Mark Current Highest Bid",
-    highlightHighestBid: "Highlight Highest Bid",
-    adminHighlight: "ADMIN HIGHLIGHT",
-    highlightConfirmTitle: "Mark Current Highest Bid",
-    highlightConfirmMessage: "Highlight the current highest bid of",
-    highlightConfirmNote: "The auction will remain LIVE and users can continue bidding normally.",
-    highlightBid: "Highlight Bid",
-    bidHighlightedSuccess: "Highest bid highlighted successfully.",
-    noBidsToHighlight: "No bids available to highlight.",
+    // Admin - Auto Highlight Bid Action
+    enableAutoHighlight: "Enable Auto Highlight",
+    disableAutoHighlight: "Disable Auto Highlight",
+    autoHighlightEnabled: "Auto highlight enabled for this auction",
+    autoHighlightDisabled: "Auto highlight disabled",
+    autoHighlightBadge: "AUTO HIGHLIGHT",
+    currentHighBid: "CURRENT HIGHEST BID",
+    markHighestBid: "Auto Highlight Highest Bid",
+    highlightHighestBid: "Auto Highlight Highest Bid",
+    adminHighlight: "CURRENT HIGHEST BID",
+    highlightConfirmTitle: "Auto Highlight Highest Bid",
+    highlightConfirmMessage: "Enable automatic green highlighting for the highest bid on",
+    highlightConfirmNote: "The current and future highest bids will automatically be highlighted in green. The auction remains LIVE and bidding continues normally.",
+    highlightBid: "Enable Auto Highlight",
+    bidHighlightedSuccess: "Auto highlight enabled successfully.",
+    noBidsToHighlight: "No bids placed yet (future bids will be auto-highlighted).",
     viewOrder: "View Order",
     // Auction Checkout
     completeOrder: "Complete Your Order",
@@ -563,16 +568,22 @@ export const translations = {
     orderStatus: "حالة الطلب",
     paymentStatus: "حالة الدفع",
     createWinnerOrder: "إنشاء طلب",
-    // Admin - Highlight Bid Action
-    markHighestBid: "تحديد أعلى مزايدة حالية",
-    highlightHighestBid: "تمييز أعلى مزايدة",
-    adminHighlight: "تحديد الإدارة",
-    highlightConfirmTitle: "تحديد أعلى مزايدة حالية",
-    highlightConfirmMessage: "هل تريد تمييز أعلى مزايدة حالية بقيمة",
-    highlightConfirmNote: "سيبقى المزاد مباشراً وسيتمكن المستخدمون من مواصلة المزايدة بشكل طبيعي.",
-    highlightBid: "تأكيد التمييز",
-    bidHighlightedSuccess: "تم تمييز أعلى مزايدة بنجاح.",
-    noBidsToHighlight: "لا توجد مزايدات لتمييزها.",
+    // Admin - Auto Highlight Bid Action
+    enableAutoHighlight: "تفعيل التمييز التلقائي",
+    disableAutoHighlight: "تعطيل التمييز التلقائي",
+    autoHighlightEnabled: "تم تفعيل التمييز التلقائي لهذا المزاد",
+    autoHighlightDisabled: "تم تعطيل التمييز التلقائي",
+    autoHighlightBadge: "تمييز تلقائي",
+    currentHighBid: "أعلى مزايدة حالية",
+    markHighestBid: "تمييز تلقائي لأعلى مزايدة",
+    highlightHighestBid: "تمييز تلقائي لأعلى مزايدة",
+    adminHighlight: "أعلى مزايدة حالية",
+    highlightConfirmTitle: "تمييز تلقائي لأعلى مزايدة",
+    highlightConfirmMessage: "هل تريد تفعيل التمييز التلقائي الأخضر لأعلى مزايدة على",
+    highlightConfirmNote: "سيتم تمييز أعلى مزايدة حالية والمزايدات القادمة باللون الأخضر تلقائياً. سيبقى المزاد مباشراً وتستمر المزايدات بشكل طبيعي.",
+    highlightBid: "تفعيل التمييز التلقائي",
+    bidHighlightedSuccess: "تم تفعيل التمييز التلقائي بنجاح.",
+    noBidsToHighlight: "لا توجد مزايدات بعد (سيتم تمييز المزايدات القادمة تلقائياً).",
     viewOrder: "عرض الطلب",
     // Auction Checkout
     completeOrder: "أكمل طلبك",
@@ -1024,11 +1035,24 @@ export function StoreProvider({ children }) {
     [loadAdminAuctions, addToast],
   );
 
+  const toggleAutoHighlight = useCallback(
+    async (id) => {
+      const res = await apiFetch(`/admin/auctions/${id}/toggle-auto-highlight`, { method: "POST" });
+      await loadAdminAuctions();
+      const msg = res.auto_highlight_enabled
+        ? (t.autoHighlightEnabled || "Auto highlight enabled for this auction")
+        : (t.autoHighlightDisabled || "Auto highlight disabled");
+      addToast(msg);
+      return res;
+    },
+    [loadAdminAuctions, addToast, t],
+  );
+
   const highlightHighestBid = useCallback(
     async (id) => {
       const res = await apiFetch(`/admin/auctions/${id}/highlight-bid`, { method: "POST" });
       await loadAdminAuctions();
-      addToast(t.bidHighlightedSuccess || "Highest bid highlighted successfully.");
+      addToast(t.autoHighlightEnabled || "Auto highlight enabled for this auction");
       return res;
     },
     [loadAdminAuctions, addToast, t],
@@ -1314,6 +1338,7 @@ export function StoreProvider({ children }) {
         updateAuction,
         deleteAuction,
         endAuction,
+        toggleAutoHighlight,
         highlightHighestBid,
         placeBid,
         notifications,

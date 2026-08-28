@@ -327,8 +327,9 @@ function resolveAuctionStatus(a) {
 function fullAuction(a) {
   if(!a) return null
   const status=resolveAuctionStatus(a)
-  const bids=db.all('bids',{auction_id:a.id}).sort((x,y)=>y.amount-x.amount)
+  const bids=db.all('bids',{auction_id:a.id}).sort((x,y)=>y.amount-x.amount || new Date(y.created_at)-new Date(x.created_at))
   const current_highest_bid=bids.length?bids[0].amount:null
+  const topBid=bids.length?bids[0]:null
   const bidderIds=new Set(bids.map(b=>b.user_id))
   const winner=db.get('auction_winners',{auction_id:a.id})
   // Auto-select winner if ended and no winner yet
@@ -338,13 +339,26 @@ function fullAuction(a) {
   }
   const finalWinner=winner||db.get('auction_winners',{auction_id:a.id})
   const images=db.all('auction_images',{auction_id:a.id}).sort((x,y)=>x.sort_order-y.sort_order).map(i=>i.url)
+
+  const isAutoHighlight = !!a.auto_highlight_enabled
+  const highlighted_bid_id = isAutoHighlight
+    ? (topBid ? topBid.id : null)
+    : (a.highlighted_bid_id || null)
+  const highlighted_bid_amount = isAutoHighlight
+    ? (topBid ? topBid.amount : null)
+    : (a.highlighted_bid_amount || null)
+  const highlighted_bidder_id = isAutoHighlight
+    ? (topBid ? topBid.user_id : null)
+    : (a.highlighted_bidder_id || null)
+
   return {
     ...a,
     status,
     current_highest_bid,
-    highlighted_bid_id: a.highlighted_bid_id || null,
-    highlighted_bid_amount: a.highlighted_bid_amount || null,
-    highlighted_bidder_id: a.highlighted_bidder_id || null,
+    auto_highlight_enabled: isAutoHighlight ? 1 : 0,
+    highlighted_bid_id,
+    highlighted_bid_amount,
+    highlighted_bidder_id,
     highlighted_at: a.highlighted_at || null,
     bid_count:bids.length,
     bidder_count:bidderIds.size,
@@ -379,7 +393,7 @@ app.get('/api/auctions/:id',(req,res)=>{
     user_name:b.user_name,
     amount:b.amount,
     created_at:b.created_at,
-    is_highlighted: b.id === a.highlighted_bid_id
+    is_highlighted: !!(result.highlighted_bid_id && b.id === result.highlighted_bid_id)
   }))
   res.json(result)
 })
@@ -394,7 +408,7 @@ app.post('/api/auctions/:id/bid',auth,(req,res)=>{
   const{amount}=req.body
   if(!amount||isNaN(amount)) return res.status(400).json({error:'Valid bid amount required'})
   const bidAmount=Number(amount)
-  const bids=db.all('bids',{auction_id:a.id}).sort((x,y)=>y.amount-x.amount)
+  const bids=db.all('bids',{auction_id:a.id}).sort((x,y)=>y.amount-x.amount || new Date(y.created_at)-new Date(x.created_at))
   const highest=bids.length?bids[0].amount:0
   const minBid=highest>0?highest+a.min_increment:a.starting_price
   if(bidAmount<minBid) return res.status(400).json({error:`Bid must be at least $${minBid.toLocaleString()}`})
@@ -405,6 +419,17 @@ app.post('/api/auctions/:id/bid',auth,(req,res)=>{
     if(diff<3000) return res.status(429).json({error:'Please wait before placing another bid'})
   }
   const bid=db.insert('bids',{auction_id:a.id,user_id:req.user.id,user_name:req.user.name,amount:bidAmount})
+
+  // If auto highlight is enabled, automatically point to the newly placed highest bid
+  if(a.auto_highlight_enabled){
+    db.update('auctions',a.id,{
+      highlighted_bid_id:bid.id,
+      highlighted_bidder_id:req.user.id,
+      highlighted_bid_amount:bidAmount,
+      highlighted_at:new Date().toISOString()
+    })
+  }
+
   res.status(201).json({message:'Bid placed successfully',bid:{id:bid.id,amount:bidAmount,user_name:req.user.name}})
 
   // ── Notification hooks ──
@@ -587,43 +612,79 @@ app.post('/api/auctions/:id/end',admin,(req,res)=>{
   res.json(fullAuction(db.byId('auctions',id)))
 })
 
-// Admin: manually highlight current highest bid (Auction remains LIVE, countdown continues, bidding continues)
+// Admin: toggle auto highlight highest bid (Auction remains LIVE, countdown continues, bidding continues)
+app.post('/api/admin/auctions/:id/toggle-auto-highlight',admin,(req,res)=>{
+  const id=Number(req.params.id)
+  const a=db.byId('auctions',id)
+  if(!a) return res.status(404).json({error:'Auction not found'})
+
+  const willEnable = !a.auto_highlight_enabled
+  const bids = db.all('bids',{auction_id:id}).sort((x,y)=>y.amount-x.amount || new Date(y.created_at)-new Date(x.created_at))
+  const topBid = bids.length ? bids[0] : null
+
+  const updates = {
+    auto_highlight_enabled: willEnable ? 1 : 0,
+    highlighted_bid_id: (willEnable && topBid) ? topBid.id : null,
+    highlighted_bid_amount: (willEnable && topBid) ? topBid.amount : null,
+    highlighted_bidder_id: (willEnable && topBid) ? topBid.user_id : null,
+    highlighted_at: willEnable ? new Date().toISOString() : null,
+    highlighted_by: willEnable ? req.user.id : null
+  }
+
+  const updated = db.update('auctions', id, updates)
+  const result = fullAuction(updated)
+
+  res.json({
+    message: willEnable ? 'Auto highlight enabled' : 'Auto highlight disabled',
+    auction: result,
+    auto_highlight_enabled: willEnable ? 1 : 0,
+    highlighted_bid: (willEnable && topBid) ? {
+      id: topBid.id,
+      user_name: topBid.user_name,
+      amount: topBid.amount,
+      user_id: topBid.user_id,
+      created_at: topBid.created_at
+    } : null
+  })
+})
+
+// Admin: manually highlight / enable auto highlight for current highest bid
 app.post('/api/admin/auctions/:id/highlight-bid',admin,(req,res)=>{
   const id=Number(req.params.id)
   const a=db.byId('auctions',id)
   if(!a) return res.status(404).json({error:'Auction not found'})
-  const bids=db.all('bids',{auction_id:id}).sort((x,y)=>y.amount-x.amount)
-  if(!bids.length){
-    return res.status(400).json({error:'No bids available to highlight'})
-  }
-  const topBid=bids[0]
+  const bids=db.all('bids',{auction_id:id}).sort((x,y)=>y.amount-x.amount || new Date(y.created_at)-new Date(x.created_at))
+  const topBid=bids.length ? bids[0] : null
   const updated=db.update('auctions',id,{
-    highlighted_bid_id:topBid.id,
-    highlighted_bidder_id:topBid.user_id,
-    highlighted_bid_amount:topBid.amount,
-    highlighted_at:new Date().toISOString(),
-    highlighted_by:req.user.id
+    auto_highlight_enabled: 1,
+    highlighted_bid_id: topBid ? topBid.id : null,
+    highlighted_bidder_id: topBid ? topBid.user_id : null,
+    highlighted_bid_amount: topBid ? topBid.amount : null,
+    highlighted_at: new Date().toISOString(),
+    highlighted_by: req.user.id
   })
   const result=fullAuction(updated)
   res.json({
-    message:'Highest bid highlighted successfully',
+    message:'Auto highlight enabled',
     auction:result,
-    highlighted_bid:{
+    auto_highlight_enabled: 1,
+    highlighted_bid: topBid ? {
       id:topBid.id,
       user_name:topBid.user_name,
       amount:topBid.amount,
       user_id:topBid.user_id,
       created_at:topBid.created_at
-    }
+    } : null
   })
 })
 
-// Admin: clear highlighted bid
+// Admin: clear highlighted bid / disable auto highlight
 app.delete('/api/admin/auctions/:id/highlight-bid',admin,(req,res)=>{
   const id=Number(req.params.id)
   const a=db.byId('auctions',id)
   if(!a) return res.status(404).json({error:'Auction not found'})
   const updated=db.update('auctions',id,{
+    auto_highlight_enabled: 0,
     highlighted_bid_id:null,
     highlighted_bidder_id:null,
     highlighted_bid_amount:null,
@@ -631,8 +692,9 @@ app.delete('/api/admin/auctions/:id/highlight-bid',admin,(req,res)=>{
     highlighted_by:null
   })
   res.json({
-    message:'Highlighted bid cleared',
-    auction:fullAuction(updated)
+    message:'Auto highlight disabled',
+    auction:fullAuction(updated),
+    auto_highlight_enabled: 0
   })
 })
 

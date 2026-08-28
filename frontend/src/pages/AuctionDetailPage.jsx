@@ -730,7 +730,7 @@ export default function AuctionDetailPage() {
           ) : (
             <div style={{ maxHeight: 300, overflowY: 'auto', scrollbarWidth: 'thin' }}>
               {bids.map((bid, i) => {
-                const isHighlighted = !!bid.is_highlighted || (auction && auction.highlighted_bid_id && bid.id === auction.highlighted_bid_id)
+                const isHighlighted = !!bid.is_highlighted || (auction && auction.auto_highlight_enabled && i === 0) || (auction && auction.highlighted_bid_id && bid.id === auction.highlighted_bid_id)
                 return (
                   <div key={bid.id} className="_bid-row" style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -773,7 +773,7 @@ export default function AuctionDetailPage() {
                               display: 'inline-flex', alignItems: 'center', gap: 3
                             }}>
                               <Check size={9} strokeWidth={2.5}/>
-                              {t.adminHighlight || 'ADMIN HIGHLIGHT'}
+                              {t.currentHighBid || 'CURRENT HIGHEST BID'}
                             </span>
                           ) : (i === 0 && (
                             <span style={{
