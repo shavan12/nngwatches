@@ -214,6 +214,14 @@ app.put('/api/orders/:id',admin,(req,res)=>{
   const order=db.update('orders',Number(req.params.id),{status})
   res.json(order)
 })
+app.delete('/api/orders/:id',admin,(req,res)=>{
+  const id=Number(req.params.id)
+  const order=db.byId('orders',id)
+  if(!order) return res.status(404).json({error:'Order not found'})
+  db.deleteWhere('order_items',{order_id:id})
+  db.delete('orders',id)
+  res.json({message:'Order deleted successfully'})
+})
 
 // ════════ BRANDS ════════
 app.get('/api/brands',(req,res)=>{
