@@ -342,6 +342,10 @@ function fullAuction(a) {
     ...a,
     status,
     current_highest_bid,
+    highlighted_bid_id: a.highlighted_bid_id || null,
+    highlighted_bid_amount: a.highlighted_bid_amount || null,
+    highlighted_bidder_id: a.highlighted_bidder_id || null,
+    highlighted_at: a.highlighted_at || null,
     bid_count:bids.length,
     bidder_count:bidderIds.size,
     winner:finalWinner?{user_name:finalWinner.user_name,amount:finalWinner.amount}:null,
@@ -370,7 +374,13 @@ app.get('/api/auctions/:id',(req,res)=>{
   const a=db.byId('auctions',Number(req.params.id))
   if(!a) return res.status(404).json({error:'Not found'})
   const result=fullAuction(a)
-  result.bids=db.all('bids',{auction_id:a.id}).sort((x,y)=>new Date(y.created_at)-new Date(x.created_at)).map(b=>({id:b.id,user_name:b.user_name,amount:b.amount,created_at:b.created_at}))
+  result.bids=db.all('bids',{auction_id:a.id}).sort((x,y)=>new Date(y.created_at)-new Date(x.created_at)).map(b=>({
+    id:b.id,
+    user_name:b.user_name,
+    amount:b.amount,
+    created_at:b.created_at,
+    is_highlighted: b.id === a.highlighted_bid_id
+  }))
   res.json(result)
 })
 
@@ -575,6 +585,55 @@ app.post('/api/auctions/:id/end',admin,(req,res)=>{
     message_ar: `تم إنهاء ${endedAuction.name} يدوياً.${bids.length>0?` الفائز: ${bids[0].user_name} ($${Number(bids[0].amount).toLocaleString()})`:'لا يوجد مزايدات.'}`
   })
   res.json(fullAuction(db.byId('auctions',id)))
+})
+
+// Admin: manually highlight current highest bid (Auction remains LIVE, countdown continues, bidding continues)
+app.post('/api/admin/auctions/:id/highlight-bid',admin,(req,res)=>{
+  const id=Number(req.params.id)
+  const a=db.byId('auctions',id)
+  if(!a) return res.status(404).json({error:'Auction not found'})
+  const bids=db.all('bids',{auction_id:id}).sort((x,y)=>y.amount-x.amount)
+  if(!bids.length){
+    return res.status(400).json({error:'No bids available to highlight'})
+  }
+  const topBid=bids[0]
+  const updated=db.update('auctions',id,{
+    highlighted_bid_id:topBid.id,
+    highlighted_bidder_id:topBid.user_id,
+    highlighted_bid_amount:topBid.amount,
+    highlighted_at:new Date().toISOString(),
+    highlighted_by:req.user.id
+  })
+  const result=fullAuction(updated)
+  res.json({
+    message:'Highest bid highlighted successfully',
+    auction:result,
+    highlighted_bid:{
+      id:topBid.id,
+      user_name:topBid.user_name,
+      amount:topBid.amount,
+      user_id:topBid.user_id,
+      created_at:topBid.created_at
+    }
+  })
+})
+
+// Admin: clear highlighted bid
+app.delete('/api/admin/auctions/:id/highlight-bid',admin,(req,res)=>{
+  const id=Number(req.params.id)
+  const a=db.byId('auctions',id)
+  if(!a) return res.status(404).json({error:'Auction not found'})
+  const updated=db.update('auctions',id,{
+    highlighted_bid_id:null,
+    highlighted_bidder_id:null,
+    highlighted_bid_amount:null,
+    highlighted_at:null,
+    highlighted_by:null
+  })
+  res.json({
+    message:'Highlighted bid cleared',
+    auction:fullAuction(updated)
+  })
 })
 
 // ════════ NOTIFICATIONS ════════

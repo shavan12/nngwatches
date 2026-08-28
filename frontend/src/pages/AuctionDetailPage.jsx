@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Timer, Users, Gavel, Trophy, TrendingUp, Clock, AlertCircle, Loader, ShoppingCart } from 'lucide-react'
+import { ArrowLeft, Timer, Users, Gavel, Trophy, TrendingUp, Clock, AlertCircle, Loader, ShoppingCart, Check, CheckCheck } from 'lucide-react'
 import { useStore } from '../context/StoreContext'
 
 // ── Inject auction-specific CSS once ─────────────────────
@@ -729,63 +729,85 @@ export default function AuctionDetailPage() {
             </div>
           ) : (
             <div style={{ maxHeight: 300, overflowY: 'auto', scrollbarWidth: 'thin' }}>
-              {bids.map((bid, i) => (
-                <div key={bid.id} className="_bid-row" style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '12px 16px',
-                  borderBottom: i < bids.length - 1 ? '1px solid var(--border-subtle)' : 'none',
-                  transition: 'background 0.15s ease'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    {/* Avatar circle */}
+              {bids.map((bid, i) => {
+                const isHighlighted = !!bid.is_highlighted || (auction && auction.highlighted_bid_id && bid.id === auction.highlighted_bid_id)
+                return (
+                  <div key={bid.id} className="_bid-row" style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '12px 16px',
+                    borderBottom: i < bids.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+                    background: isHighlighted ? 'rgba(76,201,168,0.06)' : undefined,
+                    borderInlineStart: isHighlighted ? '3px solid #4cc9a8' : '3px solid transparent',
+                    transition: 'all 0.15s ease'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      {/* Avatar circle */}
+                      <div style={{
+                        width: 32, height: 32, borderRadius: '50%',
+                        background: isHighlighted ? 'rgba(76,201,168,0.15)' : (i === 0 ? 'var(--gold-muted)' : 'var(--bg-card)'),
+                        border: `1px solid ${isHighlighted ? 'rgba(76,201,168,0.45)' : (i === 0 ? 'var(--border)' : 'var(--border-subtle)')}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '0.62rem', fontWeight: 700,
+                        color: isHighlighted ? '#4cc9a8' : (i === 0 ? 'var(--gold)' : 'var(--text-muted)'),
+                        flexShrink: 0
+                      }}>
+                        {bid.user_name?.charAt(0)?.toUpperCase() || '?'}
+                      </div>
+                      <div>
+                        <div style={{
+                          fontSize: '0.78rem', fontWeight: isHighlighted ? 600 : 500,
+                          color: isHighlighted ? '#4cc9a8' : (i === 0 ? 'var(--off-white)' : 'var(--text-primary)'),
+                          display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6
+                        }}>
+                          <span>{bid.user_name}</span>
+                          {isHighlighted ? (
+                            <span style={{
+                              padding: '2px 7px',
+                              background: 'rgba(76,201,168,0.15)',
+                              border: '1px solid rgba(76,201,168,0.35)',
+                              borderRadius: 3,
+                              fontSize: '0.52rem', fontWeight: 700,
+                              letterSpacing: '0.08em', textTransform: 'uppercase',
+                              color: '#4cc9a8',
+                              verticalAlign: 'middle',
+                              display: 'inline-flex', alignItems: 'center', gap: 3
+                            }}>
+                              <Check size={9} strokeWidth={2.5}/>
+                              {t.adminHighlight || 'ADMIN HIGHLIGHT'}
+                            </span>
+                          ) : (i === 0 && (
+                            <span style={{
+                              padding: '1px 6px',
+                              background: 'var(--gold-muted)',
+                              border: '1px solid rgba(201,168,76,0.25)',
+                              borderRadius: 2,
+                              fontSize: '0.5rem', fontWeight: 600,
+                              letterSpacing: '0.1em', textTransform: 'uppercase',
+                              color: 'var(--gold)',
+                              verticalAlign: 'middle'
+                            }}>
+                              {t.highestBid || 'Highest'}
+                            </span>
+                          ))}
+                        </div>
+                        <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                          {timeAgo(bid.created_at, t)}
+                        </div>
+                      </div>
+                    </div>
                     <div style={{
-                      width: 32, height: 32, borderRadius: '50%',
-                      background: i === 0 ? 'var(--gold-muted)' : 'var(--bg-card)',
-                      border: `1px solid ${i === 0 ? 'var(--border)' : 'var(--border-subtle)'}`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '0.62rem', fontWeight: 600,
-                      color: i === 0 ? 'var(--gold)' : 'var(--text-muted)',
+                      fontFamily: 'var(--font-display)',
+                      fontSize: i === 0 || isHighlighted ? '1.05rem' : '0.95rem',
+                      fontWeight: isHighlighted ? 600 : 400,
+                      color: isHighlighted ? '#4cc9a8' : (i === 0 ? 'var(--gold)' : 'var(--gold-dark)'),
+                      textShadow: isHighlighted ? '0 0 10px rgba(76,201,168,0.2)' : undefined,
                       flexShrink: 0
                     }}>
-                      {bid.user_name?.charAt(0)?.toUpperCase() || '?'}
-                    </div>
-                    <div>
-                      <div style={{
-                        fontSize: '0.78rem', fontWeight: 500,
-                        color: i === 0 ? 'var(--off-white)' : 'var(--text-primary)'
-                      }}>
-                        {bid.user_name}
-                        {i === 0 && (
-                          <span style={{
-                            marginLeft: 8, padding: '1px 6px',
-                            background: 'var(--gold-muted)',
-                            border: '1px solid rgba(201,168,76,0.25)',
-                            borderRadius: 2,
-                            fontSize: '0.5rem', fontWeight: 600,
-                            letterSpacing: '0.1em', textTransform: 'uppercase',
-                            color: 'var(--gold)',
-                            verticalAlign: 'middle'
-                          }}>
-                            {t.highestBid || 'Highest'}
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: 2 }}>
-                        {timeAgo(bid.created_at, t)}
-                      </div>
+                      ${bid.amount.toLocaleString()}
                     </div>
                   </div>
-                  <div style={{
-                    fontFamily: 'var(--font-display)',
-                    fontSize: i === 0 ? '1.05rem' : '0.95rem',
-                    fontWeight: 400,
-                    color: i === 0 ? 'var(--gold)' : 'var(--gold-dark)',
-                    flexShrink: 0
-                  }}>
-                    ${bid.amount.toLocaleString()}
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>

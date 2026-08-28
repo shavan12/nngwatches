@@ -656,7 +656,7 @@ export default function AdminPage() {
     createProduct, updateProduct, deleteProduct,
     orders, loadOrders, updateOrderStatus,
     stats, loadStats, addBrand, deleteBrand, addCategory, deleteCategory, uploadImage,
-    auctions, auctionsLoading, loadAdminAuctions, createAuction, updateAuction, deleteAuction, endAuction,
+    auctions, auctionsLoading, loadAdminAuctions, createAuction, updateAuction, deleteAuction, endAuction, highlightHighestBid,
     api, addToast
   } = useStore()
 
@@ -669,6 +669,8 @@ export default function AdminPage() {
   const [newCategory, setNewCategory] = useState({slug:'',name_en:'',name_ar:''})
   const [auctionModal, setAuctionModal] = useState(null)
   const [deleteAuctionConfirm, setDeleteAuctionConfirm] = useState(null)
+  const [highlightConfirm, setHighlightConfirm] = useState(null)
+  const [highlighting, setHighlighting] = useState(false)
   const [isMobile, setIsMobile]       = useState(window.innerWidth < 768)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [adminNotifs, setAdminNotifs] = useState([])
@@ -1075,6 +1077,19 @@ export default function AdminPage() {
                         </div>
                         <div style={{fontSize:'0.65rem',color:'var(--text-muted)'}}>
                           {a.brand} · {t.highestBid||'Highest Bid'}: <span style={{color:'var(--gold)',fontWeight:600}}>${Number(a.current_highest_bid||a.starting_price).toLocaleString()}</span> · {a.bid_count||0} {t.bidders||'bids'} · {a.bidder_count||0} {t.bidders||'bidders'}
+                          {a.highlighted_bid_id && (
+                            <span style={{
+                              marginInlineStart: 8, padding: '1px 6px',
+                              background: 'rgba(76,201,168,0.12)',
+                              border: '1px solid rgba(76,201,168,0.35)',
+                              borderRadius: 3,
+                              fontSize: '0.55rem', fontWeight: 700,
+                              color: '#4cc9a8',
+                              display: 'inline-flex', alignItems: 'center', gap: 3
+                            }}>
+                              <Check size={9} strokeWidth={2.5}/> {t.adminHighlight || 'ADMIN HIGHLIGHT'}: ${Number(a.highlighted_bid_amount || 0).toLocaleString()}
+                            </span>
+                          )}
                         </div>
                         {a.winner && (
                           <div style={{fontSize:'0.62rem',color:'var(--gold)',marginTop:3}}>
@@ -1084,6 +1099,28 @@ export default function AdminPage() {
                       </div>
                       {/* Actions */}
                       <div style={{display:'flex',gap:6,flexShrink:0}}>
+                        {/* 4th Action: Highlight Highest Bid (GREEN) */}
+                        <button
+                          onClick={() => {
+                            if (!a.bid_count || a.bid_count === 0) {
+                              addToast(t.noBidsToHighlight || 'No bids available to highlight.', 'error')
+                            } else {
+                              setHighlightConfirm(a)
+                            }
+                          }}
+                          title={t.markHighestBid || 'Mark Current Highest Bid'}
+                          style={{
+                            width: 34, height: 34, borderRadius: 'var(--radius-sm)',
+                            border: a.highlighted_bid_id ? '1px solid rgba(76,201,168,0.55)' : '1px solid rgba(76,201,168,0.3)',
+                            background: a.highlighted_bid_id ? 'rgba(76,201,168,0.18)' : 'rgba(76,201,168,0.06)',
+                            color: '#4cc9a8',
+                            cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <CheckCheck size={14}/>
+                        </button>
                         {a.status==='live' && (
                           <button onClick={()=>endAuction(a.id)} title={t.endAuction||'End Auction'} style={{width:34,height:34,borderRadius:'var(--radius-sm)',border:'1px solid rgba(245,158,11,0.3)',background:'rgba(245,158,11,0.05)',color:'#f59e0b',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
                             <StopCircle size={13}/>
@@ -1481,6 +1518,53 @@ export default function AdminPage() {
               <button style={{flex:1,padding:'12px',background:'#e04444',color:'white',borderRadius:'var(--radius-sm)',fontSize:'0.72rem',fontWeight:600,letterSpacing:'0.1em',textTransform:'uppercase',cursor:'pointer',border:'none'}}
                 onClick={async()=>{await deleteAuction(deleteAuctionConfirm.id);setDeleteAuctionConfirm(null)}}>
                 {t.delete||'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Highlight Highest Bid Confirm Modal ── */}
+      {highlightConfirm && (
+        <div className="modal-overlay">
+          <div className="modal-box" style={{maxWidth:360,padding:24,textAlign:'center',margin:16}}>
+            <div style={{width:52,height:52,borderRadius:'50%',background:'rgba(76,201,168,0.12)',border:'1px solid rgba(76,201,168,0.35)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 14px'}}>
+              <CheckCheck size={22} style={{color:'#4cc9a8'}}/>
+            </div>
+            <h3 style={{fontFamily:'var(--font-display)',fontSize:'1.15rem',marginBottom:8,fontWeight:400}}>
+              {t.highlightConfirmTitle || 'Mark Current Highest Bid'}
+            </h3>
+            <p style={{fontSize:'0.82rem',color:'var(--text-secondary)',marginBottom:12,lineHeight:1.5}}>
+              {t.highlightConfirmMessage || 'Highlight the current highest bid of'}{' '}
+              <strong style={{color:'#4cc9a8'}}>${Number(highlightConfirm.current_highest_bid || highlightConfirm.starting_price).toLocaleString()}</strong>{' '}
+              {t.forWatch || 'for'} <strong style={{color:'var(--text-primary)'}}>{highlightConfirm.name}</strong>?
+            </p>
+            <div style={{fontSize:'0.7rem',color:'var(--text-muted)',background:'var(--bg-elevated)',padding:'8px 12px',borderRadius:'var(--radius-sm)',marginBottom:20,border:'1px solid var(--border-subtle)'}}>
+              {t.highlightConfirmNote || 'The auction will remain LIVE and users can continue bidding normally.'}
+            </div>
+            <div style={{display:'flex',gap:10}}>
+              <button className="btn btn-outline" style={{flex:1,padding:'10px',fontSize:'0.72rem'}} onClick={()=>setHighlightConfirm(null)}>
+                {t.cancel || 'Cancel'}
+              </button>
+              <button
+                style={{
+                  flex:1,padding:'10px',background:'#4cc9a8',color:'#0a0a0a',
+                  borderRadius:'var(--radius-sm)',fontSize:'0.72rem',fontWeight:700,
+                  cursor:'pointer',border:'none',display:'flex',alignItems:'center',
+                  justifyContent:'center',gap:6
+                }}
+                disabled={highlighting}
+                onClick={async () => {
+                  setHighlighting(true)
+                  try {
+                    await highlightHighestBid(highlightConfirm.id)
+                    setHighlightConfirm(null)
+                  } catch {} finally {
+                    setHighlighting(false)
+                  }
+                }}
+              >
+                {highlighting ? (t.loading || 'Saving...') : (t.highlightBid || 'Highlight')}
               </button>
             </div>
           </div>

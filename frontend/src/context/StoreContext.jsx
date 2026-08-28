@@ -283,6 +283,16 @@ export const translations = {
     orderStatus: "Order Status",
     paymentStatus: "Payment Status",
     createWinnerOrder: "Create Order",
+    // Admin - Highlight Bid Action
+    markHighestBid: "Mark Current Highest Bid",
+    highlightHighestBid: "Highlight Highest Bid",
+    adminHighlight: "ADMIN HIGHLIGHT",
+    highlightConfirmTitle: "Mark Current Highest Bid",
+    highlightConfirmMessage: "Highlight the current highest bid of",
+    highlightConfirmNote: "The auction will remain LIVE and users can continue bidding normally.",
+    highlightBid: "Highlight Bid",
+    bidHighlightedSuccess: "Highest bid highlighted successfully.",
+    noBidsToHighlight: "No bids available to highlight.",
     viewOrder: "View Order",
     // Auction Checkout
     completeOrder: "Complete Your Order",
@@ -553,6 +563,16 @@ export const translations = {
     orderStatus: "حالة الطلب",
     paymentStatus: "حالة الدفع",
     createWinnerOrder: "إنشاء طلب",
+    // Admin - Highlight Bid Action
+    markHighestBid: "تحديد أعلى مزايدة حالية",
+    highlightHighestBid: "تمييز أعلى مزايدة",
+    adminHighlight: "تحديد الإدارة",
+    highlightConfirmTitle: "تحديد أعلى مزايدة حالية",
+    highlightConfirmMessage: "هل تريد تمييز أعلى مزايدة حالية بقيمة",
+    highlightConfirmNote: "سيبقى المزاد مباشراً وسيتمكن المستخدمون من مواصلة المزايدة بشكل طبيعي.",
+    highlightBid: "تأكيد التمييز",
+    bidHighlightedSuccess: "تم تمييز أعلى مزايدة بنجاح.",
+    noBidsToHighlight: "لا توجد مزايدات لتمييزها.",
     viewOrder: "عرض الطلب",
     // Auction Checkout
     completeOrder: "أكمل طلبك",
@@ -1004,6 +1024,16 @@ export function StoreProvider({ children }) {
     [loadAdminAuctions, addToast],
   );
 
+  const highlightHighestBid = useCallback(
+    async (id) => {
+      const res = await apiFetch(`/admin/auctions/${id}/highlight-bid`, { method: "POST" });
+      await loadAdminAuctions();
+      addToast(t.bidHighlightedSuccess || "Highest bid highlighted successfully.");
+      return res;
+    },
+    [loadAdminAuctions, addToast, t],
+  );
+
   const placeBid = useCallback(
     async (auctionId, amount) => {
       const res = await apiFetch(`/auctions/${auctionId}/bid`, {
@@ -1284,6 +1314,7 @@ export function StoreProvider({ children }) {
         updateAuction,
         deleteAuction,
         endAuction,
+        highlightHighestBid,
         placeBid,
         notifications,
         unreadCount,
