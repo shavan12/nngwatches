@@ -1,31 +1,44 @@
-// NNG Luxury — Push Notification Service Worker
+// NNG Luxury — Web Push & PWA Service Worker
 
 const APP_NAME = 'NNG Watches'
-const APP_ICON = '/NG.webp'
+const APP_ICON = '/NNGF.png'
+const APP_BADGE = '/NNGF.png'
 
-// Handle push events from the server
+// Install event — skip waiting to activate immediately
+self.addEventListener('install', (event) => {
+  self.skipWaiting()
+})
+
+// Activate event — claim all clients immediately
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim())
+})
+
+// Handle push events from Web Push (APNs for iOS, FCM for Chrome/Android/Desktop)
 self.addEventListener('push', (event) => {
-  let data = { title: APP_NAME, body: 'New notification', url: '/' }
+  let data = { title: APP_NAME, body: 'New notification from NNG Watches', url: '/' }
 
   if (event.data) {
     try {
       data = event.data.json()
-    } catch {
-      data.body = event.data.text()
+    } catch (err) {
+      data.body = event.data.text() || 'New notification'
     }
   }
 
+  const title = data.title || APP_NAME
   const options = {
     body: data.body || data.message || '',
     icon: data.icon || APP_ICON,
-    badge: APP_ICON,
+    badge: data.badge || APP_BADGE,
     image: data.image || undefined,
-    tag: data.tag || `nng-${Date.now()}`,
+    tag: data.tag || `nng-${data.notificationId || Date.now()}`,
     renotify: true,
     requireInteraction: data.requireInteraction || false,
     data: {
-      url: data.url || data.action_url || '/',
+      url: data.url || data.action_url || data.actionUrl || '/',
       notificationId: data.notificationId || null,
+      timestamp: data.timestamp || Date.now()
     },
     actions: data.actions || [],
     vibrate: [100, 50, 100],
@@ -33,33 +46,35 @@ self.addEventListener('push', (event) => {
   }
 
   event.waitUntil(
-    self.registration.showNotification(data.title || APP_NAME, options)
+    self.registration.showNotification(title, options)
   )
 })
 
-// Handle notification click — open the relevant page
+// Handle notification click — open or focus PWA window
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
 
-  const url = event.notification.data?.url || '/'
+  const targetUrl = event.notification.data?.url || '/'
+  const absoluteTargetUrl = new URL(targetUrl, self.location.origin).href
 
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      // If a window is already open, focus it and navigate
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      // If a matching window/PWA client is already open, focus it and navigate
       for (const client of windowClients) {
         if (client.url.includes(self.location.origin)) {
-          client.focus()
-          client.navigate(url)
+          if ('focus' in client) {
+            client.focus()
+          }
+          if ('navigate' in client) {
+            client.navigate(absoluteTargetUrl)
+          }
           return
         }
       }
       // Otherwise open a new window
-      return clients.openWindow(url)
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(absoluteTargetUrl)
+      }
     })
   )
-})
-
-// Activate immediately
-self.addEventListener('activate', (event) => {
-  event.waitUntil(clients.claim())
 })

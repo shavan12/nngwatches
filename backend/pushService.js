@@ -43,24 +43,52 @@ function getPublicKey() {
   return vapidKeys ? vapidKeys.publicKey : null
 }
 
-// Save a push subscription for a user
-function saveSubscription(userId, subscription) {
-  // Remove any existing subscription with the same endpoint for this user
-  const existing = db.get('push_subscriptions', { user_id: userId, endpoint: subscription.endpoint })
-  if (existing) {
-    db.update('push_subscriptions', existing.id, {
-      keys_p256dh: subscription.keys.p256dh,
-      keys_auth: subscription.keys.auth,
-    })
-    return existing
+// Save a push subscription for a user (supports multiple devices: iPhone, Android, Desktop)
+function saveSubscription(userId, subscription, { platform = 'desktop', userAgent = '' } = {}) {
+  const endpoint = subscription.endpoint
+  const p256dh = subscription.keys?.p256dh || ''
+  const auth = subscription.keys?.auth || ''
+
+  if (!endpoint || !p256dh || !auth) {
+    throw new Error('Invalid subscription object: missing endpoint or keys')
   }
 
-  return db.insert('push_subscriptions', {
+  // Detect platform if not provided
+  let detectedPlatform = platform
+  if (!detectedPlatform || detectedPlatform === 'desktop') {
+    if (/iPad|iPhone|iPod/.test(userAgent)) detectedPlatform = 'ios'
+    else if (/Android/.test(userAgent)) detectedPlatform = 'android'
+    else if (/Macintosh|Mac OS X/.test(userAgent)) detectedPlatform = 'macos'
+    else if (/Windows/.test(userAgent)) detectedPlatform = 'windows'
+  }
+
+  // Check if this specific endpoint is already registered
+  const existing = db.get('push_subscriptions', { endpoint })
+  if (existing) {
+    db.update('push_subscriptions', existing.id, {
+      user_id: userId,
+      keys_p256dh: p256dh,
+      keys_auth: auth,
+      platform: detectedPlatform,
+      user_agent: userAgent ? userAgent.substring(0, 250) : (existing.user_agent || ''),
+      active: 1,
+      updated_at: new Date().toISOString()
+    })
+    console.log(`📱 Push subscription updated for user ${userId} (${detectedPlatform})`)
+    return db.byId('push_subscriptions', existing.id)
+  }
+
+  const newSub = db.insert('push_subscriptions', {
     user_id: userId,
-    endpoint: subscription.endpoint,
-    keys_p256dh: subscription.keys.p256dh,
-    keys_auth: subscription.keys.auth,
+    endpoint,
+    keys_p256dh: p256dh,
+    keys_auth: auth,
+    platform: detectedPlatform,
+    user_agent: userAgent ? userAgent.substring(0, 250) : '',
+    active: 1
   })
+  console.log(`📱 New push subscription saved for user ${userId} (${detectedPlatform})`)
+  return newSub
 }
 
 // Remove a push subscription
@@ -68,20 +96,22 @@ function removeSubscription(userId, endpoint) {
   const sub = db.get('push_subscriptions', { user_id: userId, endpoint })
   if (sub) {
     db.delete('push_subscriptions', sub.id)
+    console.log(`📱 Push subscription removed for user ${userId}`)
     return true
   }
   return false
 }
 
-// Send a push notification to a specific user
+// Send a push notification to a specific user across all their registered devices (iPhone, Android, Desktop)
 async function sendToUser(userId, { title, body, icon, image, url, tag, notificationId }) {
   const subscriptions = db.all('push_subscriptions', { user_id: userId })
-  if (subscriptions.length === 0) return
+  if (subscriptions.length === 0) return { sent: 0, dead: 0, platforms: [] }
 
   const payload = JSON.stringify({
     title: title || 'NNG Watches',
     body: body || '',
-    icon: icon || '/NG.webp',
+    icon: icon || '/NNGF.png',
+    badge: '/NNGF.png',
     image: image || undefined,
     url: url || '/',
     tag: tag || `nng-${notificationId || Date.now()}`,
@@ -90,6 +120,8 @@ async function sendToUser(userId, { title, body, icon, image, url, tag, notifica
   })
 
   const deadSubs = []
+  let sentCount = 0
+  const activePlatforms = []
 
   for (const sub of subscriptions) {
     const pushSub = {
@@ -102,12 +134,17 @@ async function sendToUser(userId, { title, body, icon, image, url, tag, notifica
 
     try {
       await webPush.sendNotification(pushSub, payload)
+      sentCount++
+      if (sub.platform && !activePlatforms.includes(sub.platform)) {
+        activePlatforms.push(sub.platform)
+      }
     } catch (err) {
       if (err.statusCode === 410 || err.statusCode === 404) {
-        // Subscription expired or invalid — remove it
+        // Subscription expired or invalid (e.g. uninstalled or reset) — remove it
         deadSubs.push(sub.id)
+      } else {
+        console.warn(`⚠️ Push delivery notice for user ${userId} (${sub.platform || 'unknown'}):`, err.message || err)
       }
-      // Silently ignore other push errors (network issues etc)
     }
   }
 
@@ -115,13 +152,18 @@ async function sendToUser(userId, { title, body, icon, image, url, tag, notifica
   for (const id of deadSubs) {
     db.delete('push_subscriptions', id)
   }
+
+  return { sent: sentCount, dead: deadSubs.length, platforms: activePlatforms }
 }
 
 // Send push to multiple users
 async function sendToUsers(userIds, data) {
+  const results = []
   for (const uid of userIds) {
-    await sendToUser(uid, data)
+    const r = await sendToUser(uid, data)
+    results.push({ userId: uid, ...r })
   }
+  return results
 }
 
 module.exports = { init, getPublicKey, saveSubscription, removeSubscription, sendToUser, sendToUsers }

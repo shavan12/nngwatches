@@ -234,7 +234,17 @@ export const translations = {
     notifPreferences: "Notification Preferences",
     deviceNotifications: "Device Notifications",
     deviceNotifEnabled: "You will receive notifications even when the website is closed",
-    deviceNotifDisabled: "Enable to get notifications on your device",
+    deviceNotifDisabled: "Enable to get notifications on your device even when you're not on the website",
+    iosHomeScreenRequired: "Add to Home Screen Required",
+    iosHomeScreenDesc: "To receive notifications on your iPhone even when the website is closed, add NNG Watches to your Home Screen first.",
+    iosStep1: "Tap the Share button in Safari",
+    iosStep2: "Select 'Add to Home Screen' (+)",
+    iosStep3: "Open NNG Watches from your Home Screen",
+    iosStep4: "Return to Notification Preferences and turn on Device Notifications",
+    iosPermissionDenied: "Notifications are blocked. Open iPhone Settings → Notifications → NNG Watches and turn on 'Allow Notifications'.",
+    openInSafariTip: "Use Safari on your iPhone to install to Home Screen.",
+    pushNotSupportedOnDevice: "Push notifications require iOS 16.4+ and adding the app to your Home Screen.",
+    permissionDeniedDesc: "Notifications are blocked. Please enable them in your browser or device settings.",
     notifCategories: "Categories",
     newAuctions: "New Auctions",
     newAuctionsDesc: "Notified when new auctions are created",
@@ -519,7 +529,17 @@ export const translations = {
     notifPreferences: "تفضيلات الإشعارات",
     deviceNotifications: "إشعارات الجهاز",
     deviceNotifEnabled: "ستتلقى إشعارات حتى عند إغلاق الموقع",
-    deviceNotifDisabled: "فعّل للحصول على إشعارات على جهازك",
+    deviceNotifDisabled: "فعّل للحصول على إشعارات على جهازك حتى عندما لا تتصفح الموقع",
+    iosHomeScreenRequired: "مطلوب الإضافة إلى الشاشة الرئيسية",
+    iosHomeScreenDesc: "لتلقي الإشعارات على جهاز iPhone حتى عند إغلاق الموقع، أضف NNG Watches إلى الشاشة الرئيسية أولاً.",
+    iosStep1: "اضغط على زر المشاركة (Share) في متصفح Safari",
+    iosStep2: "اختر 'إضافة إلى الشاشة الرئيسية' (+ Add to Home Screen)",
+    iosStep3: "افتح تطبيق NNG Watches من الشاشة الرئيسية",
+    iosStep4: "ارجع إلى تفضيلات الإشعارات وفعّل إشعارات الجهاز",
+    iosPermissionDenied: "الإشعارات محظورة. افتح إعدادات iPhone ← الإشعارات ← NNG Watches وفعّل 'السماح بالإشعارات'.",
+    openInSafariTip: "يرجى استخدام متصفح Safari على iPhone لإضافة التطبيق إلى الشاشة الرئيسية.",
+    pushNotSupportedOnDevice: "تتطلب إشعارات الويب نظام iOS 16.4 أو أحدث مع إضافة التطبيق إلى الشاشة الرئيسية.",
+    permissionDeniedDesc: "تم حظر الإشعارات. يرجى تفعيلها من إعدادات المتصفح أو الجهاز.",
     notifCategories: "الفئات",
     newAuctions: "مزادات جديدة",
     newAuctionsDesc: "إشعار عند إنشاء مزادات جديدة",
@@ -1182,46 +1202,96 @@ export function StoreProvider({ children }) {
     };
   }, [user]);
 
-  // ── Web Push Notifications ───────────────────────────────
+  // ── Web Push Notifications & iOS PWA Support ───────────────
   const [pushEnabled, setPushEnabled] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
+  const [isPushSupported, setIsPushSupported] = useState(false);
+  const [permissionState, setPermissionState] = useState("default");
   const swRef = useRef(null);
 
-  // Check if push is currently active
+  // Check device capabilities and active push subscription
   useEffect(() => {
+    const isIosDevice = typeof navigator !== "undefined" && (
+      /iPad|iPhone|iPod/.test(navigator.userAgent || "") ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+    );
+    const isStandaloneMode = typeof window !== "undefined" && (
+      window.matchMedia("(display-mode: standalone)").matches ||
+      window.navigator.standalone === true ||
+      document.referrer?.includes("ios-app://")
+    );
+    const pushSupported = typeof window !== "undefined" &&
+      "serviceWorker" in navigator &&
+      ("PushManager" in window || "showNotification" in (window.ServiceWorkerRegistration?.prototype || {})) &&
+      "Notification" in window;
+
+    setIsIOS(isIosDevice);
+    setIsStandalone(isStandaloneMode);
+    setIsPushSupported(pushSupported);
+
+    if (typeof window !== "undefined" && "Notification" in window) {
+      setPermissionState(Notification.permission);
+    }
+
     if ("serviceWorker" in navigator && "PushManager" in window) {
       navigator.serviceWorker.getRegistration("/sw.js").then((reg) => {
-        if (reg) {
+        if (reg && reg.pushManager) {
           reg.pushManager.getSubscription().then((sub) => {
             setPushEnabled(!!sub);
-          });
+          }).catch(() => {});
         }
-      });
+      }).catch(() => {});
     }
   }, []);
 
   const subscribeToPush = useCallback(async () => {
     try {
-      if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-        addToast("Push notifications are not supported in this browser", "error");
+      const isIosDevice = typeof navigator !== "undefined" && (
+        /iPad|iPhone|iPod/.test(navigator.userAgent || "") ||
+        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+      );
+      const isStandaloneMode = typeof window !== "undefined" && (
+        window.matchMedia("(display-mode: standalone)").matches ||
+        window.navigator.standalone === true ||
+        document.referrer?.includes("ios-app://")
+      );
+
+      // On iOS Safari, Web Push requires the site to be installed to Home Screen (iOS 16.4+)
+      if (isIosDevice && !isStandaloneMode) {
+        addToast(t.iosHomeScreenDesc || "Add NNG Watches to your Home Screen to enable notifications on iPhone", "info");
         return false;
       }
 
-      // Request notification permission
+      if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+        addToast(t.pushNotSupportedOnDevice || "Push notifications are not supported in this browser", "error");
+        return false;
+      }
+
+      // Request notification permission (must be triggered by direct user tap)
       const permission = await Notification.requestPermission();
+      setPermissionState(permission);
+
       if (permission !== "granted") {
-        addToast("Notification permission denied", "error");
+        const errorMsg = isIosDevice
+          ? (t.iosPermissionDenied || "Notifications are blocked. Open Settings → Notifications → NNG Watches and allow notifications.")
+          : (t.permissionDeniedDesc || "Notification permission denied");
+        addToast(errorMsg, "error");
         return false;
       }
 
-      // Register service worker
-      const registration = await navigator.serviceWorker.register("/sw.js");
+      // Register or get active service worker
+      let registration = await navigator.serviceWorker.getRegistration("/sw.js");
+      if (!registration) {
+        registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+      }
       await navigator.serviceWorker.ready;
       swRef.current = registration;
 
       // Get VAPID public key from server
       const { publicKey } = await apiFetch("/notifications/push/vapid-key");
       if (!publicKey) {
-        addToast("Push not available", "error");
+        addToast("Push service not available", "error");
         return false;
       }
 
@@ -1234,32 +1304,40 @@ export function StoreProvider({ children }) {
         applicationServerKey[i] = rawData.charCodeAt(i);
       }
 
-      // Subscribe to push
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey,
-      });
+      // Check existing subscription or create new one
+      let subscription = await registration.pushManager.getSubscription();
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey,
+        });
+      }
 
-      // Send subscription to server
+      // Send subscription to server with device platform info
+      const platform = isIosDevice ? "ios" : (/Android/.test(navigator.userAgent || "") ? "android" : "desktop");
       await apiFetch("/notifications/push/subscribe", {
         method: "POST",
-        body: JSON.stringify({ subscription: subscription.toJSON() }),
+        body: JSON.stringify({
+          subscription: subscription.toJSON(),
+          platform,
+          userAgent: navigator.userAgent || ""
+        }),
       });
 
       setPushEnabled(true);
-      addToast("Push notifications enabled!");
+      addToast(t.deviceNotifEnabled || "Device notifications enabled!");
       return true;
     } catch (err) {
       console.error("Push subscription failed:", err);
-      addToast("Failed to enable push notifications", "error");
+      addToast(t.error || "Failed to enable push notifications", "error");
       return false;
     }
-  }, []);
+  }, [t, apiFetch, addToast]);
 
   const unsubscribeFromPush = useCallback(async () => {
     try {
       const registration = await navigator.serviceWorker.getRegistration("/sw.js");
-      if (registration) {
+      if (registration && registration.pushManager) {
         const subscription = await registration.pushManager.getSubscription();
         if (subscription) {
           await apiFetch("/notifications/push/unsubscribe", {
@@ -1270,11 +1348,12 @@ export function StoreProvider({ children }) {
         }
       }
       setPushEnabled(false);
-      addToast("Push notifications disabled");
-    } catch {
-      addToast("Failed to disable push", "error");
+      addToast(t.deviceNotifDisabled || "Device notifications disabled");
+    } catch (err) {
+      console.error("Unsubscribe failed:", err);
+      addToast(t.error || "Failed to disable push", "error");
     }
-  }, []);
+  }, [t, apiFetch, addToast]);
 
   return (
     <StoreContext.Provider
@@ -1348,6 +1427,10 @@ export function StoreProvider({ children }) {
         markAllNotificationsRead,
         deleteNotification,
         pushEnabled,
+        isIOS,
+        isStandalone,
+        isPushSupported,
+        permissionState,
         subscribeToPush,
         unsubscribeFromPush,
       }}

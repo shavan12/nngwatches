@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, Check, CheckCheck, Trash2, Settings, Gavel, Trophy, AlertTriangle, Clock, Megaphone, TrendingUp, ChevronDown } from 'lucide-react'
+import { Bell, Check, CheckCheck, Trash2, Settings, Gavel, Trophy, AlertTriangle, Clock, Megaphone, TrendingUp, ChevronDown, Share2, PlusSquare, Smartphone, Info, AlertCircle } from 'lucide-react'
 import { useStore } from '../context/StoreContext'
 
 const TYPE_CONFIG = {
@@ -32,17 +32,20 @@ function timeAgo(dateStr) {
 }
 
 const getPrefLabels = (t) => [
-  { key: 'new_auctions',      label: t.newAuctions || 'New Auctions',         desc: t.newAuctionsDesc || 'When a new auction is created' },
-  { key: 'upcoming_auctions', label: t.upcomingAuctions || 'Upcoming Auctions',    desc: t.upcomingAuctionsDesc || 'Reminders before auction starts' },
-  { key: 'auction_started',   label: t.auctionStarted || 'Auction Started',      desc: t.auctionStartedDesc || 'When an auction goes live' },
-  { key: 'new_bids',          label: t.newBids || 'New Bids',             desc: t.newBidsDesc || 'When someone bids on your auction' },
-  { key: 'outbid',            label: t.outbidAlerts || 'Outbid Alerts',        desc: t.outbidAlertsDesc || 'When someone outbids you', mandatory: true },
+  { key: 'new_auctions',      label: t.newAuctions || 'New Auctions',         desc: t.newAuctionsDesc || 'When new auctions are listed' },
+  { key: 'upcoming_auctions', label: t.upcomingAuctions || 'Upcoming Auctions',    desc: t.upcomingAuctionsDesc || 'Reminders before auctions start' },
+  { key: 'bids_activity',     label: t.bidsActivity || 'Bid Activity',         desc: t.bidsActivityDesc || 'New bids & outbid alerts', mandatory: true },
   { key: 'auction_ending',    label: t.auctionEnding || 'Auction Ending',       desc: t.auctionEndingDesc || 'Reminders before auction ends' },
   { key: 'auction_results',   label: t.auctionResults || 'Auction Results',      desc: t.auctionResultsDesc || 'Win/loss notifications', mandatory: true },
 ]
 
 export default function NotificationsPage() {
-  const { t, lang, dir, notifications, unreadCount, fetchNotifications, markNotificationRead, markAllNotificationsRead, deleteNotification, user, addToast, api, pushEnabled, subscribeToPush, unsubscribeFromPush } = useStore()
+  const {
+    t, lang, dir, notifications, unreadCount, fetchNotifications,
+    markNotificationRead, markAllNotificationsRead, deleteNotification,
+    user, addToast, api, pushEnabled, isIOS, isStandalone,
+    isPushSupported, permissionState, subscribeToPush, unsubscribeFromPush
+  } = useStore()
   const [activeTab, setActiveTab] = useState('all')
   const [showPrefs, setShowPrefs] = useState(false)
   const [prefs, setPrefs] = useState(null)
@@ -175,19 +178,34 @@ export default function NotificationsPage() {
         <div className="notif-prefs-panel" style={{ marginBottom: 32 }}>
           <h3 style={{ fontSize: '0.8rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--gold)', marginBottom: 16 }}>{t.notifPreferences || 'Notification Preferences'}</h3>
           
-          {/* Push Notifications toggle */}
-          {'Notification' in window && (
-            <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid var(--border)' }}>
-              <div className="notif-pref-row" style={{ paddingTop: 0 }}>
-                <div>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>📱 {t.deviceNotifications || 'Device Notifications'}</div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>
-                    {pushEnabled 
-                      ? 'You will receive notifications even when the website is closed' 
-                      : 'Enable to get notifications on your device even when you\'re not on the website'}
-                  </div>
+          {/* Push Notifications Section — Desktop, Android & iOS */}
+          <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: '1px solid var(--border)' }}>
+            <div className="notif-pref-row" style={{ paddingTop: 0, alignItems: 'flex-start' }}>
+              <div style={{ flex: 1, paddingRight: dir === 'rtl' ? 0 : 12, paddingLeft: dir === 'rtl' ? 12 : 0 }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span>📱</span>
+                  <span>{t.deviceNotifications || 'Device Notifications'}</span>
+                  {pushEnabled && (
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                      padding: '1px 6px', borderRadius: 3,
+                      background: 'rgba(76,201,168,0.15)', border: '1px solid rgba(76,201,168,0.35)',
+                      fontSize: '0.58rem', fontWeight: 700, color: '#4cc9a8'
+                    }}>
+                      <Check size={9} strokeWidth={2.5}/> ACTIVE
+                    </span>
+                  )}
                 </div>
-                <label className="notif-toggle">
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 4 }}>
+                  {pushEnabled
+                    ? (t.deviceNotifEnabled || 'You will receive notifications even when the website is closed')
+                    : (t.deviceNotifDisabled || 'Enable to get notifications on your device even when you\'re not on the website')}
+                </div>
+              </div>
+
+              {/* Toggle switch for Standalone iOS, Android, and Desktop */}
+              {(!isIOS || isStandalone) && (
+                <label className="notif-toggle" style={{ marginTop: 2 }}>
                   <input
                     type="checkbox"
                     checked={pushEnabled}
@@ -195,9 +213,74 @@ export default function NotificationsPage() {
                   />
                   <span className="notif-toggle-slider" />
                 </label>
-              </div>
+              )}
             </div>
-          )}
+
+            {/* iOS Safari Home Screen Installation Card */}
+            {isIOS && !isStandalone && (
+              <div style={{
+                marginTop: 14,
+                padding: '14px 16px',
+                background: 'rgba(201,168,76,0.06)',
+                border: '1px solid rgba(201,168,76,0.25)',
+                borderRadius: 'var(--radius)',
+                fontSize: '0.72rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--gold)', fontWeight: 600, marginBottom: 8 }}>
+                  <Smartphone size={16} />
+                  <span>{t.iosHomeScreenRequired || 'Add to Home Screen Required for iPhone'}</span>
+                </div>
+                <p style={{ margin: '0 0 10px 0', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+                  {t.iosHomeScreenDesc || 'To receive notifications on your iPhone even when the website is closed, add NNG Watches to your Home Screen first.'}
+                </p>
+                <div style={{ display: 'grid', gap: 6, margin: '8px 0', paddingLeft: dir === 'rtl' ? 0 : 4, paddingRight: dir === 'rtl' ? 4 : 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-primary)' }}>
+                    <Share2 size={13} style={{ color: 'var(--gold)', flexShrink: 0 }} />
+                    <span>1. {t.iosStep1 || 'Tap the Share button in Safari'}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-primary)' }}>
+                    <PlusSquare size={13} style={{ color: 'var(--gold)', flexShrink: 0 }} />
+                    <span>2. {t.iosStep2 || 'Select "Add to Home Screen" (+)'}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-primary)' }}>
+                    <Smartphone size={13} style={{ color: 'var(--gold)', flexShrink: 0 }} />
+                    <span>3. {t.iosStep3 || 'Open NNG Watches from your Home Screen'}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-primary)' }}>
+                    <Check size={13} style={{ color: 'var(--gold)', flexShrink: 0 }} />
+                    <span>4. {t.iosStep4 || 'Return to Notification Preferences and enable Device Notifications'}</span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                  <Info size={11} />
+                  <span>{t.openInSafariTip || 'Use Safari on your iPhone to install to Home Screen.'}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Permission Denied Guide */}
+            {permissionState === 'denied' && (
+              <div style={{
+                marginTop: 12,
+                padding: '10px 14px',
+                background: 'rgba(231,76,60,0.1)',
+                border: '1px solid rgba(231,76,60,0.3)',
+                borderRadius: 'var(--radius)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                color: '#e74c3c',
+                fontSize: '0.7rem'
+              }}>
+                <AlertCircle size={14} style={{ flexShrink: 0 }} />
+                <span>
+                  {isIOS
+                    ? (t.iosPermissionDenied || 'Notifications are blocked. Open iPhone Settings → Notifications → NNG Watches and turn on "Allow Notifications".')
+                    : (t.permissionDeniedDesc || 'Notifications are blocked. Please enable them in your browser or device settings.')}
+                </span>
+              </div>
+            )}
+          </div>
 
           <div style={{ fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>{t.notifCategories || 'Categories'}</div>
           {getPrefLabels(t).map(({ key, label, desc, mandatory }) => (

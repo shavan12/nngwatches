@@ -837,12 +837,13 @@ app.get('/api/notifications/push/vapid-key',(req,res)=>{
   res.json({publicKey:key})
 })
 
-// Subscribe to push notifications
+// Subscribe to push notifications (multi-device: iOS, Android, Desktop)
 app.post('/api/notifications/push/subscribe',auth,(req,res)=>{
-  const{subscription}=req.body
+  const{subscription,platform}=req.body
   if(!subscription||!subscription.endpoint||!subscription.keys) return res.status(400).json({error:'Invalid subscription'})
-  pushService.saveSubscription(req.user.id,subscription)
-  res.json({message:'Push subscription saved'})
+  const userAgent = req.headers['user-agent'] || ''
+  const saved = pushService.saveSubscription(req.user.id, subscription, { platform, userAgent })
+  res.json({message:'Push subscription saved', subscription: { id: saved.id, platform: saved.platform }})
 })
 
 // Unsubscribe from push notifications
@@ -851,6 +852,26 @@ app.post('/api/notifications/push/unsubscribe',auth,(req,res)=>{
   if(!endpoint) return res.status(400).json({error:'Endpoint required'})
   pushService.removeSubscription(req.user.id,endpoint)
   res.json({message:'Push subscription removed'})
+})
+
+// Admin: send a test push notification to verify device connectivity
+app.post('/api/admin/notifications/test-push',admin,async (req,res)=>{
+  const targetUserId = req.body.user_id ? Number(req.body.user_id) : req.user.id
+  const title = req.body.title || 'NNG Watches — Test Notification'
+  const body = req.body.body || 'This is a test notification verifying your device push delivery.'
+  const url = req.body.url || '/'
+
+  const result = await pushService.sendToUser(targetUserId, {
+    title,
+    body,
+    url,
+    tag: `test-push-${Date.now()}`
+  })
+
+  res.json({
+    message: result.sent > 0 ? `Test push delivered to ${result.sent} device(s)` : 'No active device subscriptions found for this user',
+    ...result
+  })
 })
 
 // ── Admin: Customer Management ──
